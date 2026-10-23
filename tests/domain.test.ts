@@ -1,0 +1,125 @@
+// Run with: npm test
+import assert from "node:assert/strict";
+import { verifyExtraction, extractionFromRecord } from "../src/domain/verification";
+import { findEligibleAlternatives } from "../src/domain/eligibility";
+import { withPrices, calculateSavings, comparableBases } from "../src/domain/pricing";
+import { MEDICINES, buildPriceRecords } from "../src/mock/catalogue";
+import { SCENARIOS } from "../src/mock/scenarios";
+import { Extraction } from "../src/domain/types";
+
+const now = new Date("2026-10-23T12:00:00Z");
+const prices = buildPriceRecords(now);
+const byId = (id: string) => MEDICINES.find((m) => m.medicine_id === id)!;
+const product = (id: string) => withPrices(byId(id), prices, now);
+let passed = 0;
+const test = (name: string, fn: () => void) => { fn(); passed++; console.log("  ✓ " + name); };
+
+console.log("Verification layer");
+test("fully matched medicine", () => {
+  const v = verifyExtraction(SCENARIOS.matched, MEDICINES);
+  assert.equal(v.status, "matched");
+  assert.equal(v.record?.medicine_id, "med_glucora_sr500");
+});
+test("missing release type needs the user to choose between catalogue entries", () => {
+  const v = verifyExtraction(SCENARIOS.ambiguous_release, MEDICINES);
+  assert.equal(v.status, "needs_confirmation");
+  assert.deepEqual(v.candidates.map((c) => c.medicine_id).sort(), ["med_glucora_500", "med_glucora_sr500"]);
+  assert.equal(v.record, null);
+});
+test("strength mismatch blocks comparison", () => {
+  const v = verifyExtraction(SCENARIOS.strength_mismatch, MEDICINES);
+  assert.equal(v.status, "unable");
+  assert.equal(v.reason, "critical_mismatch");
+  assert.equal(v.checks.find((c) => c.field === "strength")?.result, "mismatch");
+});
+test("correcting the strength re-verifies and then matches", () => {
+  const fixed: Extraction = { ...SCENARIOS.strength_mismatch, strength: { value: "40 mg", read: "user" } };
+  const v = verifyExtraction(fixed, MEDICINES);
+  assert.equal(v.status, "matched");
+  assert.equal(v.record?.medicine_id, "med_telvia_40");
+});
+test("a different release type never matches", () => {
+  const wrong: Extraction = { ...SCENARIOS.matched, release_type: { value: "ER", read: "user" } };
+  assert.equal(verifyExtraction(wrong, MEDICINES).status, "unable");
+});
+test("unreadable photo is blocked", () => {
+  const v = verifyExtraction(SCENARIOS.unreadable, MEDICINES);
+  assert.equal(v.status, "unable");
+  assert.equal(v.reason, "unreadable");
+});
+test("unknown brand is blocked", () => {
+  const ex: Extraction = { ...SCENARIOS.matched, brand_name: { value: "Zentrova 10", read: "clear" }, active_ingredients: { value: "Rosuvastatin", read: "clear" } };
+  assert.equal(verifyExtraction(ex, MEDICINES).reason, "no_record");
+});
+test("manual pick of a catalogue record verifies as matched", () => {
+  assert.equal(verifyExtraction(extractionFromRecord(byId("med_amlocard_5")), MEDICINES).status, "matched");
+});
+
+test("a brand read from the pack but missing from the catalogue is no_record", () => {
+  const ex: Extraction = { brand_name: { value: "Cetimac", read: "clear" }, active_ingredients: { value: "Cetirizine", read: "clear" }, strength: { value: "10 mg", read: "clear" }, dosage_form: { value: "Tablet", read: "clear" }, release_type: { value: null, read: "not_found" } };
+  const v = verifyExtraction(ex, MEDICINES);
+  assert.equal(v.status, "unable");
+  assert.equal(v.reason, "no_record");
+  assert.equal(v.checks[0].result, "no_record");
+});
+
+console.log("Eligibility");
+test("only approved, exact-formulation alternatives are returned", () => {
+  const r = findEligibleAlternatives(byId("med_glucora_sr500"), MEDICINES);
+  assert.deepEqual(r.eligible.map((m) => m.medicine_id).sort(), ["med_duometa_sr500", "med_glyminor_sr500", "med_metaveda_sr500", "med_metsave_sr500"]);
+  const reasons = Object.fromEntries(r.excluded.map((e) => [e.reason, e.count]));
+  assert.deepEqual(reasons, { not_reviewed: 1, different_release: 1, different_strength: 1, different_ingredients: 1 });
+});
+test("no eligible alternative for Telvia 40", () => {
+  assert.equal(findEligibleAlternatives(byId("med_telvia_40"), MEDICINES).eligible.length, 0);
+});
+
+test("cetirizine group: approved alternatives only, misspelling normalised", () => {
+  const r = findEligibleAlternatives(byId("med_allerfree_10"), MEDICINES);
+  assert.deepEqual(r.eligible.map((m) => m.medicine_id), ["med_cetzy_10"]);
+  assert.equal(r.excluded.find((e) => e.reason === "not_reviewed")?.count, 1);
+  const ex: Extraction = { brand_name: { value: null, read: "not_found" }, active_ingredients: { value: "Cetrizine", read: "clear" }, strength: { value: "10 mg", read: "clear" }, dosage_form: { value: "Tablet", read: "clear" }, release_type: { value: "IR", read: "clear" } };
+  const v = verifyExtraction(ex, MEDICINES);
+  assert.equal(v.status, "needs_confirmation"); // brand unknown: user must pick the product
+});
+
+console.log("Prices and savings");
+test("price freshness flags", () => {
+  assert.equal(product("med_metsave_sr500").mrp?.freshness, "current");
+  assert.equal(product("med_metaveda_sr500").mrp?.freshness, "stale");
+  assert.equal(product("med_duometa_sr500").mrp?.freshness, "unverified");
+  assert.equal(product("med_glyminor_sr500").actual_selling_price, null);
+});
+test("savings: ₹4.00 vs ₹2.00 per tablet, 1 a day → ₹60/month, ₹720/year", () => {
+  const s = calculateSavings(product("med_glucora_sr500"), product("med_metsave_sr500"), "MRP", 1);
+  assert.ok(s.ok);
+  if (s.ok) {
+    assert.equal(s.current.monthly, 120);
+    assert.equal(s.alternative.monthly, 60);
+    assert.equal(s.monthlySaving, 60);
+    assert.equal(s.annualSaving, 720);
+  }
+});
+test("pack-size normalisation (₹45 for 15 vs ₹40 for 10), 2 a day", () => {
+  const s = calculateSavings(product("med_glucora_sr500"), product("med_glyminor_sr500"), "MRP", 2);
+  assert.ok(s.ok);
+  if (s.ok) {
+    assert.equal(s.alternative.per_unit, 3);
+    assert.equal(s.monthlySaving, 60); // (4 − 3) × 2 × 30
+    assert.equal(s.annualSaving, 720);
+  }
+});
+test("selling-price basis only when both have verified selling prices", () => {
+  assert.deepEqual(comparableBases(product("med_glucora_sr500"), product("med_metsave_sr500")), ["MRP", "SELLING_PRICE"]);
+  assert.deepEqual(comparableBases(product("med_glucora_sr500"), product("med_glyminor_sr500")), ["MRP"]);
+  const s = calculateSavings(product("med_glucora_sr500"), product("med_metsave_sr500"), "SELLING_PRICE", 1);
+  assert.ok(s.ok && s.monthlySaving === 54 && s.annualSaving === 648);
+});
+test("stale or unverified prices produce no savings and name the problem", () => {
+  const stale = calculateSavings(product("med_glucora_sr500"), product("med_metaveda_sr500"), "MRP", 1);
+  assert.ok(!stale.ok && stale.problems[0].issue === "stale" && stale.problems[0].who === "alternative");
+  const unv = calculateSavings(product("med_amlocard_5"), product("med_amlonest_5"), "MRP", 1);
+  assert.ok(!unv.ok && unv.problems[0].issue === "unverified" && unv.problems[0].who === "current");
+});
+
+console.log(`\n${passed} tests passed`);
