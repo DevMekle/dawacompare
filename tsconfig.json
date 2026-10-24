@@ -4,5 +4,5 @@
     "jsx": "react", "strict": true, "noEmit": true, "allowUmdGlobalAccess": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"], "skipLibCheck": true, "types": ["react", "react-dom", "node"]
   },
-  "include": ["src", "tests", "api"]
+  "include": ["src", "tests", "functions", "server", "scripts"]
 }

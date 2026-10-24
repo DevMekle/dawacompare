@@ -1,6 +1,6 @@
 // Tests the /api/identify function with OpenAI's endpoint mocked. Run with: npm test
 import assert from "node:assert/strict";
-import handler from "../api/identify";
+import handler from "../functions/identify";
 import { toExtraction } from "../src/api/client";
 
 type Captured = { url?: string; init?: any };

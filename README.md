@@ -26,8 +26,8 @@ Open `dist/index.html` in a browser. It loads React and the fonts from public CD
 | Part of the planned system | In this prototype |
 |---|---|
 | Photo upload, camera capture, preview, replace | **Works.** The photo stays in the browser and is never uploaded or read. |
-| OpenAI Vision extraction | **Implemented** in `api/identify.ts` (Vercel function → OpenAI Responses API, strict JSON schema). Active only on a deployment with `OPENAI_API_KEY`. Without it, uploads go to manual entry; sample packs and the presenter option use simulated readings (`src/mock/scenarios.ts`). |
-| Medicine catalogue (PostgreSQL) | **Implemented.** `db/schema.sql` + `db/seed.sql`, served by `api/catalogue.ts` through `server/sqlStore.ts` when `DATABASE_URL` is set. Without a database the API (and the page itself) use the same rows from `src/data/seed.ts`. |
+| OpenAI Vision extraction | **Implemented** in `functions/identify.ts` (Vercel function → OpenAI Responses API, strict JSON schema). Active only on a deployment with `OPENAI_API_KEY`. Without it, uploads go to manual entry; sample packs and the presenter option use simulated readings (`src/mock/scenarios.ts`). |
+| Medicine catalogue (PostgreSQL) | **Implemented.** `db/schema.sql` + `db/seed.sql`, served by `functions/catalogue.ts` through `server/sqlStore.ts` when `DATABASE_URL` is set. Without a database the API (and the page itself) use the same rows from `src/data/seed.ts`. |
 | Verification Layer | **Implemented** as real logic (`src/domain/verification.ts`), run against the mock catalogue. |
 | Eligibility filtering (approved review, exact formulation) | **Implemented** (`src/domain/eligibility.ts`). |
 | Price database | **Implemented** as the `price_records` table (type, pack quantity, source, verification status, last-verified date). The rows are fictional samples. |
@@ -44,7 +44,7 @@ Open `dist/index.html` in a browser. It loads React and the fonts from public CD
    - **From your computer:** `npx vercel link`, `npx vercel env pull .env.local`, then `npm run db:setup`.
 3. Redeploy. On the Compare screen the line under the sample-data note changes to "From the DawaCompare database · 101 products".
 
-Any Postgres 14+ works (Supabase, RDS, local): set `DATABASE_URL` to its connection string. The app talks to it only through `api/catalogue.ts`.
+Any Postgres 14+ works (Supabase, RDS, local): set `DATABASE_URL` to its connection string. The app talks to it only through `functions/catalogue.ts`.
 
 ### What's in the sample catalogue
 
@@ -94,7 +94,7 @@ The UI only talks to `src/api/client.ts`. On a deployment it calls these endpoin
 
 | Method | Planned endpoint |
 |---|---|
-| `identifyWithVision` | `POST /api/identify` (**built**, see `api/identify.ts`) |
+| `identifyWithVision` | `POST /api/identify` (**built**, see `functions/identify.ts`) |
 | `identifyFromPhoto` | simulated readings for demos |
 | `verify`, `searchCatalogue`, `getComparison` | `/api/catalogue` (**built**, PostgreSQL or bundled seed) |
 | `verify` | `POST /api/verify` (Verification Layer) |
@@ -106,8 +106,9 @@ The domain functions in `src/domain/` are pure and can move to the server unchan
 ## Project structure
 
 ```
-api/identify.ts          Vercel function: photo → OpenAI Vision → printed fields
-api/catalogue.ts         Vercel function: search, verify, comparison from the database
+functions/identify.ts    serverless function source: photo → OpenAI Vision → printed fields
+functions/catalogue.ts   serverless function source: search, verify, comparison from the database
+api/*.js                 the same functions bundled by `npm run build:api` (generated; Vercel runs these)
 server/                  PostgreSQL store (Neon driver) and store selection
 db/schema.sql, seed.sql  database tables and sample data
 scripts/                 seed.sql generator and db:setup loader

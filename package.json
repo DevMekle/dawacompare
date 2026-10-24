@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "description": "DawaCompare: medicine price comparison prototype (React + TypeScript, sample data)",
   "scripts": {
-    "build": "node build.mjs",
+    "build": "node scripts/build-api.mjs && node build.mjs",
     "typecheck": "tsc -p .",
     "test": "esbuild tests/domain.test.ts tests/identify.test.ts --bundle --platform=node --outdir=.test-build --out-extension:.js=.cjs --log-level=warning && esbuild tests/database.test.ts --bundle --platform=node --format=esm --packages=external --outfile=.test-build/database.test.mjs --log-level=warning && node .test-build/domain.test.cjs && node .test-build/identify.test.cjs && node .test-build/database.test.mjs",
     "db:sql": "esbuild scripts/build-seed-sql.ts --bundle --platform=node --format=esm --outfile=.test-build/build-seed-sql.mjs --log-level=warning && node .test-build/build-seed-sql.mjs",
-    "db:setup": "esbuild scripts/db-setup.ts --bundle --platform=node --format=esm --packages=external --outfile=.test-build/db-setup.mjs --log-level=warning && node .test-build/db-setup.mjs"
+    "db:setup": "esbuild scripts/db-setup.ts --bundle --platform=node --format=esm --packages=external --outfile=.test-build/db-setup.mjs --log-level=warning && node .test-build/db-setup.mjs",
+    "build:api": "node scripts/build-api.mjs"
   },
   "keywords": [],
   "author": "",
