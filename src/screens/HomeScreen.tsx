@@ -179,7 +179,6 @@ export function HomeScreen(p: Props) {
       </details>
 
       <div className="fineprint">
-        <p className="privacy"><Icon name="lock" size={16} />{p.aiName ? withAi(t.privacyLive, p.aiName) : p.demo ? t.privacy : t.privacyLocal}</p>
         <p className="disclaimer">{t.disclaimer}</p>
       </div>
     </section>

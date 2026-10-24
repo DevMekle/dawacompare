@@ -29,7 +29,7 @@ export function VerificationChecks({ checks }: { checks: FieldCheck[] }) {
         <span role="columnheader">{t.colCatalogue}</span>
         <span role="columnheader">{t.colResult}</span>
       </div>
-      {checks.map((c) => (
+      {checks.filter((c) => c.field !== "release_type" || c.result === "mismatch").map((c) => (
         <div key={c.field} className={`check-row is-${c.result === "no_record" && c.field !== "brand_name" ? "neutral" : c.result}`} role="row">
           <span className="check-field" role="rowheader">{t.fields[c.field]}</span>
           <span className="check-read" role="cell">
@@ -70,7 +70,7 @@ export function CandidatePicker({ candidates, checks, value, onChange }: { candi
             <span className="pick-body">
               <strong>{m.brand_name}</strong>
               <span className="pick-facts">
-                <span className={differing.has("release_type") ? "hl" : ""}>{t.releases[m.release_type]}</span>
+                {differing.has("release_type") && <span className="hl">{t.releases[m.release_type]}</span>}
                 <span className={differing.has("strength") ? "hl" : ""}>{m.strength}</span>
                 <span>{m.active_ingredients.join(" + ")}</span>
                 {m.manufacturer && <span className="muted">{m.manufacturer}</span>}
@@ -89,7 +89,7 @@ export function FieldEditor({ draft, onChange }: { draft: Extraction; onChange: 
   const set = (f: FieldKey, v: string) => onChange({ ...draft, [f]: { value: v || null, read: v ? "user" : "not_found" } });
   return (
     <div className="editor">
-      {CRITICAL_FIELDS.map((f) => (
+      {CRITICAL_FIELDS.filter((f) => f !== "release_type" || !!draft.release_type.value).map((f) => (
         <div className="ed-field" key={f}>
           <label htmlFor={`ed-${f}`}>{t.fields[f]}</label>
           {f === "dosage_form" ? (

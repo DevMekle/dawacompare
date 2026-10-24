@@ -15,7 +15,6 @@ function IdentityCard({ ex, maker }: { ex: Extraction; maker: string | null }) {
   const generic = isSaltName(brand, salt);
   const name = generic || !brand ? [salt, strength].filter(Boolean).join(" ") : brand;
   const form = ex.dosage_form.value ? (t.forms as Record<string, string>)[ex.dosage_form.value] ?? ex.dosage_form.value : t.idNotFound;
-  const rel = ex.release_type.value ? (t.releases as Record<string, string>)[ex.release_type.value] ?? ex.release_type.value : t.idReleaseNone;
   return (
     <div className="card id-card">
       <p className="id-kicker"><Icon name="circleCheck" size={16} />{t.idKicker}</p>
@@ -26,7 +25,6 @@ function IdentityCard({ ex, maker }: { ex: Extraction; maker: string | null }) {
         <dt>{t.idSalt}</dt><dd>{salt ?? t.idNotFound}</dd>
         <dt>{t.idStrength}</dt><dd>{strength ?? t.idNotFound}</dd>
         <dt>{t.idForm}</dt><dd>{form}</dd>
-        <dt>{t.idRelease}</dt><dd>{rel}</dd>
       </dl>
     </div>
   );
@@ -73,7 +71,7 @@ export function VerifyScreen(p: Props) {
   const { t } = useI18n();
   const r = p.result;
   const [title, body] = t.status[r.status];
-  const toCheck = r.checks.filter((c) => c.result === "unclear" || c.result === "missing").map((c) => t.fields[c.field].toLowerCase());
+  const toCheck = r.checks.filter((c) => c.field !== "release_type" && (c.result === "unclear" || c.result === "missing")).map((c) => t.fields[c.field].toLowerCase());
   const ok = canConfirm(r, p.chosenId, p.ack);
 
   // Not in the catalogue: show what was identified, then compare by salt (formulation listed) or say we have no data.
@@ -115,17 +113,17 @@ export function VerifyScreen(p: Props) {
           <h2>{t.packTitle}</h2>
           <p>{t.packBody}</p>
           <p className="facts"><span className="fact">{matches[0].active_ingredients.join(" + ")} · {matches[0].strength}</span><span className="fact">{t.forms[matches[0].dosage_form]}</span></p>
-          <div>
+          {releaseOptions.length > 1 && <div>
             <span className="field-label" id="pack-rel-label">{t.packRelease}</span>
             <div className="pick-list" role="radiogroup" aria-labelledby="pack-rel-label">
               {releaseOptions.map((rt) => (
                 <label key={rt} className={`pick-item ${packRelease === rt ? "on" : ""}`}>
                   <input type="radio" name="pack-release" id={`pack-rel-${rt}`} checked={packRelease === rt} onChange={() => setPackRelease(rt)} />
-                  <span className="pick-body"><strong>{t.releases[rt]}</strong></span>
+                  <span className="pick-body"><strong>{t.releasePlain[rt]}</strong></span>
                 </label>
               ))}
             </div>
-          </div>
+          </div>}
           <div className="pack-grid">
             <div><label htmlFor="pack-mrp">{t.packMrp}</label><input id="pack-mrp" className="input" type="number" inputMode="decimal" min={0.01} step={0.01} value={packMrp} onChange={(e: any) => setPackMrp(e.target.value)} /></div>
             <div><label htmlFor="pack-qty">{t.packQty}</label><input id="pack-qty" className="input" type="number" inputMode="numeric" min={1} step={1} value={packQty} onChange={(e: any) => setPackQty(e.target.value)} /></div>

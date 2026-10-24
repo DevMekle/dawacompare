@@ -395,7 +395,7 @@ export function App() {
               <div className="rail-card">
                 <p className="med-kicker">{t.yours}</p>
                 <p className="rail-med">{confirmed.record.brand_name}</p>
-                <p className="muted small">{confirmed.record.active_ingredients.join(" + ")} · {confirmed.record.strength} · {t.releases[confirmed.record.release_type]}</p>
+                <p className="muted small">{confirmed.record.active_ingredients.join(" + ")} · {confirmed.record.strength}</p>
               </div>
             )}
             <p className="rail-fine">{t.disclaimer}</p>

@@ -11,7 +11,6 @@ export function Formulation({ p }: { p: Pick<ComparableProduct, "active_ingredie
     <div className="facts">
       <span className="fact">{p.active_ingredients.join(" + ")} · {p.strength}</span>
       <span className="fact">{t.forms[p.dosage_form]}</span>
-      <span className="fact">{t.releases[p.release_type]}</span>
     </div>
   );
 }

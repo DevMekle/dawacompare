@@ -55,7 +55,7 @@ function perUnit(p: ComparableProduct, basis: PriceType): string {
 
 export function buildSummary(s: SummaryInput, t: Strings, lang: Lang): Summary {
   const c = s.current;
-  const formulation = (p: ComparableProduct) => `${p.active_ingredients.join(" + ")} · ${p.strength} · ${t.forms[p.dosage_form]} · ${t.releases[p.release_type]}`;
+  const formulation = (p: ComparableProduct) => `${p.active_ingredients.join(" + ")} · ${p.strength} · ${t.forms[p.dosage_form]}`;
   const how = s.how === "matched" ? t.rptHowMatched : s.how === "vision" ? withAi(t.rptHowVision, s.aiName ?? null) : s.how === "chosen" ? t.rptHowChosen : s.how === "pack" ? t.rptHowPack : t.rptHowManual;
 
   const confirmed: [string, string][] = [
@@ -63,7 +63,6 @@ export function buildSummary(s: SummaryInput, t: Strings, lang: Lang): Summary {
     [t.fields.active_ingredients, c.active_ingredients.join(" + ")],
     [t.fields.strength, c.strength],
     [t.fields.dosage_form, t.forms[c.dosage_form]],
-    [t.fields.release_type, t.releases[c.release_type]],
     [t.manufacturer, c.manufacturer ?? "—"],
     [t.priceTypes.MRP, priceText(c.mrp, t, lang)],
     [t.priceTypes.SELLING_PRICE, c.actual_selling_price ? priceText(c.actual_selling_price, t, lang) : t.noVerifiedPrice],

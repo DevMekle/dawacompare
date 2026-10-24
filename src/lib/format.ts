@@ -17,5 +17,5 @@ export function fmtDate(iso: string | Date, lang: Lang): string {
 }
 
 export function fmtNum(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, "");
+  return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
 }

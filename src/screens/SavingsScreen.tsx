@@ -23,7 +23,7 @@ interface Props {
 
 export function SavingsScreen(p: Props) {
   const { t } = useI18n();
-  const [other, setOther] = useState(p.unitsPerDay != null && ![1, 2, 3].includes(p.unitsPerDay));
+  const [other, setOther] = useState(p.unitsPerDay != null && ![0.5, 1, 2, 3].includes(p.unitsPerDay));
   const segValue: number | "other" | null = other ? "other" : p.unitsPerDay;
   const needsQty = p.outcome.ok && !p.unitsPerDay;
   const canNext = !needsQty;
@@ -47,14 +47,14 @@ export function SavingsScreen(p: Props) {
                 id="qty"
                 label={t.calcTitle}
                 value={segValue}
-                options={[{ value: 1, label: "1" }, { value: 2, label: "2" }, { value: 3, label: "3" }, { value: "other", label: t.other }]}
+                options={[{ value: 0.5, label: "½" }, { value: 1, label: "1" }, { value: 2, label: "2" }, { value: 3, label: "3" }, { value: "other", label: t.other }]}
                 onChange={(v) => {
                   if (v === "other") { setOther(true); p.setUnitsPerDay(null); }
                   else { setOther(false); p.setUnitsPerDay(v); }
                 }}
               />
               {other && (
-                <input id="qty-other" className="input" type="number" inputMode="decimal" min={0.5} max={20} step={0.5} aria-labelledby="qty-label"
+                <input id="qty-other" className="input" type="number" inputMode="decimal" min={0.25} max={20} step="any" placeholder={t.otherQtyHint} aria-labelledby="qty-label"
                   value={p.unitsPerDay ?? ""} onChange={(e: any) => { const n = parseFloat(e.target.value); p.setUnitsPerDay(Number.isFinite(n) && n > 0 && n <= 20 ? n : null); }} />
               )}
               <p className="field-hint"><Icon name="stethoscope" size={14} />{t.calcHelp}</p>

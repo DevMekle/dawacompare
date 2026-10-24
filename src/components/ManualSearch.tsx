@@ -74,7 +74,7 @@ export function ManualSearch({ onPick, autoFocus, onIdentifyName }: Props) {
                 <button type="button" className="result" onClick={() => onPick(m)}>
                   <span className="result-main">
                     <strong>{m.brand_name}</strong>
-                    <span className="muted small">{m.active_ingredients.join(" + ")} · {m.strength} · {t.releases[m.release_type]}</span>
+                    <span className="muted small">{m.active_ingredients.join(" + ")} · {m.strength}</span>
                   </span>
                   <span className="result-cta">{t.manualPick}<Icon name="arrowRight" size={16} /></span>
                 </button>
