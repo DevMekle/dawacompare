@@ -1,7 +1,7 @@
 import { useI18n } from "../i18n";
 import { ComparisonResponse } from "../domain/types";
 import { Icon } from "../components/Icon";
-import { ActionBar, Notice, ScreenHead, Segmented, Spinner } from "../components/ui";
+import { ActionBar, Notice, Segmented, Spinner } from "../components/ui";
 import { MedicineCard } from "../components/MedicineCard";
 import { DEMO } from "../lib/mode";
 
@@ -30,7 +30,7 @@ export function CompareScreen(p: Props) {
   if (p.state !== "ready" || !p.data) {
     return (
       <section className="screen">
-        <ScreenHead headRef={p.headRef} title={t.s3Title} body={t.s3Body} />
+        <h1 ref={p.headRef} tabIndex={-1} className="visually-hidden">{t.s3Title}</h1>
         {p.state === "error" ? (
           <>
             <Notice tone="block" icon="alert" role="alert">{t.loadErr}</Notice>
@@ -56,7 +56,7 @@ export function CompareScreen(p: Props) {
 
   return (
     <section className="screen">
-      <ScreenHead headRef={p.headRef} title={t.s3Title} body={t.s3Body} />
+      <h1 ref={p.headRef} tabIndex={-1} className="visually-hidden">{t.s3Title}</h1>
       <Notice tone="info" icon="info">{DEMO ? t.sampleNote : t.realNote}</Notice>
       {p.catalogue && <p className="cat-src muted small"><Icon name="database" size={14} />{t.catalogueFrom(p.catalogue.source, p.catalogue.medicines)}</p>}
 
