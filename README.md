@@ -2,7 +2,7 @@
 
 A mobile-first React + TypeScript prototype for Indian households that buy the same prescription medicines every month. A user photographs a medicine strip, confirms what it is, sees reviewed alternatives with the same formulation, and gets a savings estimate to discuss with their doctor or pharmacist.
 
-The live catalogue is **real data** in PostgreSQL: 23 common Indian brands (MRP from public online pharmacy listings) and 22 **Jan Aushadhi** generics (drug code, unit size and MRP from the government PMBJP product list), every price dated. Fictional sample data is used only in **demo mode** (`?demo`, the Claude artifact or a local file) to show every safety state. Photo reading uses the **real OpenAI Vision API** when the app is deployed on Vercel with an `OPENAI_API_KEY`; everywhere else it falls back to manual name entry or a clearly labelled simulated reading.
+The live catalogue is **real data** in PostgreSQL: 51 Indian brands (MRP from public online pharmacy listings) and 22 **Jan Aushadhi** generics (drug code, unit size and MRP from the government PMBJP product list), every price dated. Fictional sample data is used only in **demo mode** (`?demo`, the Claude artifact or a local file) to show every safety state. Photo reading uses the **real OpenAI Vision API** when the app is deployed on Vercel with an `OPENAI_API_KEY`; everywhere else it falls back to manual name entry or a clearly labelled simulated reading.
 
 ## Run it
 
@@ -47,7 +47,7 @@ Open `dist/index.html` in a browser. It loads React and the fonts from public CD
 ## Product features
 
 - **Compare by salt**: if a brand isn't in the catalogue but its salt, strength and form are, the customer confirms the release type and enters the MRP and pack size printed on their pack. The price is labelled "Printed on your pack (entered by you)".
-- **Jan Aushadhi generics** as alternatives, badged and dated; brands are never offered as alternatives.
+- **Two kinds of alternative:** other companies' brands with the same salt, strength, form and release type, and **Jan Aushadhi generics**. Each is badged and dated, and the compare screen can filter All / Branded / Jan Aushadhi.
 - **Share on WhatsApp** from the summary (family or doctor).
 - **My medicines**: saved on the device (localStorage) to re-check at the next refill.
 - **Feedback** ("Was this helpful?") and anonymous usage events stored in the `feedback` and `events` tables; the home page shows the live count of comparisons.
@@ -72,6 +72,8 @@ Any Postgres 14+ works (Supabase, RDS, local): set `DATABASE_URL` to its connect
 ### What's in the live catalogue
 
 Real brands (MRP, public listing, checked 24 Oct 2026): Crocin Advance 500, Dolo 650, Okacet 10, L Cet 5, Glycomet SR 500, Amaryl 1, Atorva 10, Atorva 20, Rosuvas 10, Amlong 5, Telma 40, Losar 50, Pan 40, Omez 20, Azithral 500, Augmentin Duo 625, Ecosprin 75, Clop 75, Brufen 400, Thyronorm 50, Dolonex Rapid 20, New Saridon, Saridon.
+
+Branded alternatives from other makers (same source and date): Calpol 650+, Crocin Advance 650, Pacimol 650, Paracip 650, Alerid 10, Cetzine 10, Levocet 5, Obimet SR 500, Glyciphage SR 500, Glimestar 1, Glimisave 1, Atorlip 10, Storvas 10, Rozavel 10, Rosulip 10, Amlokind 5, Stamlo 5, Telmikind 40, Telsartan 40, Repace 50, Omee 20, Ocid 20, Azee 500, Moxikind-CV 625, Clavam 625, Deplatt 75, Clopilet 75, Ibugesic 400. Every brand is also offered as an alternative to the others, except Thyronorm, Dolonex Rapid and Saridon.
 
 Jan Aushadhi generics (PMBJP product list, updated 30 Aug 2026): paracetamol 500/650, cetirizine 10, levocetirizine 5, metformin 500 and 500 PR, glimepiride 1/2, atorvastatin 10/20, rosuvastatin 10, amlodipine 5, telmisartan 40, losartan 50, pantoprazole 40, omeprazole 20, azithromycin 500, amoxycillin + clavulanate 625, aspirin 75 EC, clopidogrel 75, ibuprofen 400, thyroxine 50 mcg.
 

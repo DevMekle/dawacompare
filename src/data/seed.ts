@@ -209,8 +209,11 @@ const GENERATED = generate();
 //
 // Brands: brand, maker, composition and MRP as shown on public online pharmacy
 //   listings (truemeds.in / pharmeasy.in / apollopharmacy.in), checked on LISTING_DATE.
-//   review_status "pending": brands are never offered as alternatives; they are
-//   recognised as the customer's current medicine.
+//   Brands are both recognised as the customer's medicine and offered as branded
+//   alternatives to each other (review_status "approved": same salt, strength, form
+//   and release type per the listing). "pending" brands are recognised only:
+//   Thyronorm (levothyroxine: switching needs a doctor), Dolonex (tablet type not
+//   confirmed), Saridon (no current listing).
 // Jan Aushadhi: government generic medicines from the PMBJP product list
 //   (drug code, unit size, MRP; list updated 30 Aug 2026), checked on LISTING_DATE.
 //   review_status "approved" means: same salt, strength, dosage form and release type
@@ -222,7 +225,7 @@ const GENERATED = generate();
 // ---------------------------------------------------------------------------
 const LISTING_DATE = "2026-10-24";
 
-type RealSpec = [id: string, brand: string, maker: string | null, salts: string[], strength: string, form: DosageForm, release: ReleaseType, mrp: number | null, pack: number];
+type RealSpec = [id: string, brand: string, maker: string | null, salts: string[], strength: string, form: DosageForm, release: ReleaseType, mrp: number | null, pack: number, review?: ReviewStatus];
 
 const BRANDS: RealSpec[] = [
   ["real_crocin_adv_500", "Crocin Advance 500", "GlaxoSmithKline Pharmaceuticals Ltd", ["Paracetamol"], "500 mg", "Tablet", "IR", 19.31, 20],
@@ -244,10 +247,39 @@ const BRANDS: RealSpec[] = [
   ["real_ecosprin_75", "Ecosprin 75", "USV Pvt Ltd", ["Aspirin"], "75 mg", "Tablet", "DR", 5.29, 14],
   ["real_clop_75", "Clop 75", "West-Coast Pharmaceutical Works Ltd", ["Clopidogrel"], "75 mg", "Tablet", "IR", 25.78, 10],
   ["real_brufen_400", "Brufen 400", "Abbott India Ltd", ["Ibuprofen"], "400 mg", "Tablet", "IR", 25.17, 15],
-  ["real_thyronorm_50", "Thyronorm 50", "Abbott India Ltd", ["Levothyroxine"], "50 mcg", "Tablet", "IR", 132.87, 120],
-  ["real_dolonex_rapid_20", "Dolonex Rapid 20", "Pfizer Ltd", ["Piroxicam"], "20 mg", "Tablet", "IR", 136.15, 10],
+  ["real_thyronorm_50", "Thyronorm 50", "Abbott India Ltd", ["Levothyroxine"], "50 mcg", "Tablet", "IR", 132.87, 120, "pending"],
+  ["real_dolonex_rapid_20", "Dolonex Rapid 20", "Pfizer Ltd", ["Piroxicam"], "20 mg", "Tablet", "IR", 136.15, 10, "pending"],
   ["real_new_saridon", "New Saridon", "Bayer Pharmaceuticals Pvt Ltd", ["Paracetamol", "Caffeine"], "500 mg + 50 mg", "Tablet", "IR", 55, 10],
-  ["real_saridon", "Saridon", null, ["Paracetamol", "Propyphenazone", "Caffeine"], "250 mg + 150 mg + 50 mg", "Tablet", "IR", null, 10],
+  ["real_saridon", "Saridon", null, ["Paracetamol", "Propyphenazone", "Caffeine"], "250 mg + 150 mg + 50 mg", "Tablet", "IR", null, 10, "pending"],
+  // Branded alternatives from other makers (same listing source and date).
+  ["real_calpol_650p", "Calpol 650+", "GlaxoSmithKline Pharmaceuticals Ltd", ["Paracetamol"], "650 mg", "Tablet", "IR", 32.04, 15],
+  ["real_crocin_adv_650", "Crocin Advance 650", "GlaxoSmithKline Pharmaceuticals Ltd", ["Paracetamol"], "650 mg", "Tablet", "IR", 31.65, 15],
+  ["real_pacimol_650", "Pacimol 650", "Ipca Laboratories Ltd", ["Paracetamol"], "650 mg", "Tablet", "IR", 32.12, 15],
+  ["real_paracip_650", "Paracip 650", "Cipla Health Ltd", ["Paracetamol"], "650 mg", "Tablet", "IR", 32.28, 15],
+  ["real_alerid_10", "Alerid 10", "Cipla Ltd", ["Cetirizine"], "10 mg", "Tablet", "IR", 20.16, 10],
+  ["real_cetzine_10", "Cetzine 10", "Dr. Reddy's Laboratories Ltd", ["Cetirizine"], "10 mg", "Tablet", "IR", 20.16, 10],
+  ["real_levocet_5", "Levocet 5", "Hetero Healthcare Ltd", ["Levocetirizine"], "5 mg", "Tablet", "IR", 52.9, 10],
+  ["real_obimet_sr_500", "Obimet SR 500", "Corona Remedies Pvt Ltd", ["Metformin"], "500 mg", "Tablet", "SR", 20.44, 10],
+  ["real_glyciphage_sr_500", "Glyciphage SR 500", "Franco-Indian Pharmaceuticals Pvt Ltd", ["Metformin"], "500 mg", "Tablet", "SR", 26.62, 10],
+  ["real_glimestar_1", "Glimestar 1", "Mankind Pharma Ltd", ["Glimepiride"], "1 mg", "Tablet", "IR", 31.94, 10],
+  ["real_glimisave_1", "Glimisave 1", "Eris Lifesciences Ltd", ["Glimepiride"], "1 mg", "Tablet", "IR", 32.78, 10],
+  ["real_atorlip_10", "Atorlip 10", "Cipla Ltd", ["Atorvastatin"], "10 mg", "Tablet", "IR", 80.16, 15],
+  ["real_storvas_10", "Storvas 10", "Sun Pharmaceutical Industries Ltd", ["Atorvastatin"], "10 mg", "Tablet", "IR", 80.14, 15],
+  ["real_rozavel_10", "Rozavel 10", "Sun Pharma Laboratories Ltd", ["Rosuvastatin"], "10 mg", "Tablet", "IR", 211.88, 10],
+  ["real_rosulip_10", "Rosulip 10", "Cipla Ltd", ["Rosuvastatin"], "10 mg", "Tablet", "IR", 364.61, 15],
+  ["real_amlokind_5", "Amlokind 5", "Mankind Pharma Ltd", ["Amlodipine"], "5 mg", "Tablet", "IR", 23.82, 15],
+  ["real_stamlo_5", "Stamlo 5", "Dr. Reddy's Laboratories Ltd", ["Amlodipine"], "5 mg", "Tablet", "IR", 80.51, 30],
+  ["real_telmikind_40", "Telmikind 40", "Mankind Pharma Ltd", ["Telmisartan"], "40 mg", "Tablet", "IR", 61.87, 10],
+  ["real_telsartan_40", "Telsartan 40", "Dr. Reddy's Laboratories Ltd", ["Telmisartan"], "40 mg", "Tablet", "IR", 99.28, 14],
+  ["real_repace_50", "Repace 50", "Sun Pharma Laboratories Ltd", ["Losartan"], "50 mg", "Tablet", "IR", 106, 10],
+  ["real_omee_20", "Omee 20", "Alkem Laboratories Ltd", ["Omeprazole"], "20 mg", "Capsule", "DR", 61.74, 20],
+  ["real_ocid_20", "Ocid 20", "Zydus Healthcare Ltd", ["Omeprazole"], "20 mg", "Capsule", "DR", 61.69, 20],
+  ["real_azee_500", "Azee 500", "Cipla Ltd", ["Azithromycin"], "500 mg", "Tablet", "IR", 126.71, 5],
+  ["real_moxikind_cv_625", "Moxikind-CV 625", "Mankind Pharma Ltd", ["Amoxicillin", "Clavulanic Acid"], "500 mg + 125 mg", "Tablet", "IR", 184.14, 10],
+  ["real_clavam_625", "Clavam 625", "Alkem Laboratories Ltd", ["Amoxicillin", "Clavulanic Acid"], "500 mg + 125 mg", "Tablet", "IR", 196.73, 10],
+  ["real_deplatt_75", "Deplatt 75", "Torrent Pharmaceuticals Ltd", ["Clopidogrel"], "75 mg", "Tablet", "IR", 102.95, 15],
+  ["real_clopilet_75", "Clopilet 75", "Sun Pharma Laboratories Ltd", ["Clopidogrel"], "75 mg", "Tablet", "IR", 107.4, 15],
+  ["real_ibugesic_400", "Ibugesic 400", "Cipla Ltd", ["Ibuprofen"], "400 mg", "Tablet", "IR", 10.2, 15],
 ];
 
 /** [drug code, product name as listed, salts, strength, form, release, unit size, MRP, review] */
@@ -279,8 +311,8 @@ const JAN_AUSHADHI: JaSpec[] = [
 ];
 
 const REAL_MEDICINES: MedicineRecord[] = [
-  ...BRANDS.map(([id, brand, maker, salts, strength, form, release]): MedicineRecord => ({
-    medicine_id: id, brand_name: brand, manufacturer: maker, active_ingredients: salts, strength, dosage_form: form, release_type: release, verification_status: "verified", review_status: "pending",
+  ...BRANDS.map(([id, brand, maker, salts, strength, form, release, , , review]): MedicineRecord => ({
+    medicine_id: id, brand_name: brand, manufacturer: maker, active_ingredients: salts, strength, dosage_form: form, release_type: release, verification_status: "verified", review_status: review ?? "approved",
   })),
   ...JAN_AUSHADHI.map(([code, name, salts, strength, form, release, , , review]): MedicineRecord => ({
     medicine_id: `ja_${code}`, brand_name: `Jan Aushadhi ${name}`, manufacturer: `PMBI (Jan Aushadhi) · drug code ${code}`, active_ingredients: salts, strength, dosage_form: form, release_type: release, verification_status: "verified", review_status: review ?? "approved",

@@ -638,3 +638,7 @@ details[open] .chev { transform: rotate(180deg); }
 .btn.on { background: var(--teal); color: var(--on-teal); border-color: var(--teal); }
 .btn-wa { color: #128C4A; border-color: currentColor; }
 .check-row.is-neutral { background: transparent; }
+
+/* Alternative-type filter: sized to its labels so they stay on one line on small phones. */
+.alt-filter .seg { display: flex !important; }
+.alt-filter .seg-btn { flex: 1 1 auto; white-space: nowrap; font-size: 14px; padding-left: 10px; padding-right: 10px; }

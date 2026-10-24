@@ -85,13 +85,17 @@ test("cetirizine group: approved alternatives only, misspelling normalised", () 
   assert.equal(verifyExtraction(ex, MEDICINES).status, "needs_confirmation"); // brand unknown: user must pick the product
 });
 
-test("real data: brands are identified, Jan Aushadhi generics are the alternatives", () => {
+test("real data: other brands and Jan Aushadhi generics are both alternatives", () => {
   assert.equal(verifyExtraction(extractionFromRecord(byId("real_dolo_650")), ALL_MEDICINES).status, "matched");
-  const dolo = findEligibleAlternatives(byId("real_dolo_650"), ALL_MEDICINES.filter((m) => isRealRecord(m.medicine_id)));
-  assert.deepEqual(dolo.eligible.map((m) => m.medicine_id), ["ja_511"]);
-  // brands are never offered as alternatives
-  const ja = findEligibleAlternatives(byId("ja_511"), ALL_MEDICINES);
-  assert.ok(!ja.eligible.some((m) => m.medicine_id.startsWith("real_")));
+  const REAL = ALL_MEDICINES.filter((m) => isRealRecord(m.medicine_id));
+  const dolo = findEligibleAlternatives(byId("real_dolo_650"), REAL);
+  assert.deepEqual(dolo.eligible.map((m) => m.medicine_id).sort(), ["ja_511", "real_calpol_650p", "real_crocin_adv_650", "real_pacimol_650", "real_paracip_650"]);
+  // a different strength of the same brand family is never offered
+  assert.ok(!findEligibleAlternatives(byId("real_crocin_adv_650"), REAL).eligible.some((m) => m.medicine_id === "real_crocin_adv_500"));
+  // brands whose switch needs a doctor or whose tablet type is unconfirmed are never offered
+  for (const id of ["real_thyronorm_50", "real_dolonex_rapid_20", "real_saridon"]) assert.ok(!REAL.some((m) => findEligibleAlternatives(m, REAL).eligible.some((e) => e.medicine_id === id)), id);
+  // Deplatt 75 user sees the cheaper Clop 75 brand
+  assert.ok(findEligibleAlternatives(byId("real_deplatt_75"), REAL).eligible.some((m) => m.medicine_id === "real_clop_75"));
   // Saridon (3 salts) and New Saridon (2 salts) are different formulations
   assert.ok(!findEligibleAlternatives(byId("real_new_saridon"), ALL_MEDICINES).eligible.some((m) => m.medicine_id === "real_saridon"));
   // levothyroxine: Jan Aushadhi row is not approved

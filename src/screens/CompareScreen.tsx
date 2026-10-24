@@ -1,7 +1,7 @@
 import { useI18n } from "../i18n";
 import { ComparisonResponse } from "../domain/types";
 import { Icon } from "../components/Icon";
-import { ActionBar, Notice, ScreenHead, Spinner } from "../components/ui";
+import { ActionBar, Notice, ScreenHead, Segmented, Spinner } from "../components/ui";
 import { MedicineCard } from "../components/MedicineCard";
 import { DEMO } from "../lib/mode";
 
@@ -19,8 +19,13 @@ interface Props {
   catalogue: { source: string; medicines: number } | null;
 }
 
+const { useState } = React;
+type Kind = "all" | "brand" | "ja";
+const kindOf = (id: string): Exclude<Kind, "all"> => (id.startsWith("ja_") ? "ja" : "brand");
+
 export function CompareScreen(p: Props) {
   const { t } = useI18n();
+  const [kind, setKind] = useState<Kind>("all");
 
   if (p.state !== "ready" || !p.data) {
     return (
@@ -43,7 +48,11 @@ export function CompareScreen(p: Props) {
 
   const { current, alternatives, excluded } = p.data;
   const unit = (x: typeof current) => x.mrp?.per_unit ?? Infinity;
-  const sorted = [...alternatives].sort((a, b) => (p.sort === "name" ? a.brand_name.localeCompare(b.brand_name) : unit(a) - unit(b)));
+  const nBrand = alternatives.filter((a) => kindOf(a.medicine_id) === "brand").length;
+  const nJa = alternatives.length - nBrand;
+  const showFilter = nBrand > 0 && nJa > 0;
+  const shown = showFilter && kind !== "all" ? alternatives.filter((a) => kindOf(a.medicine_id) === kind) : alternatives;
+  const sorted = [...shown].sort((a, b) => (p.sort === "name" ? a.brand_name.localeCompare(b.brand_name) : unit(a) - unit(b)));
 
   return (
     <section className="screen">
@@ -72,6 +81,13 @@ export function CompareScreen(p: Props) {
               </select>
             </div>
           </div>
+          {showFilter && (
+            <div className="alt-filter"><Segmented<Kind> label={t.filterLabel} value={kind} onChange={setKind} options={[
+              { value: "all", label: t.filterAll(alternatives.length) },
+              { value: "brand", label: t.filterBrand(nBrand) },
+              { value: "ja", label: t.filterJa(nJa) },
+            ]} /></div>
+          )}
           <div className="alts" role="radiogroup" aria-label={t.s3Title}>
             {sorted.map((a) => (
               <MedicineCard key={a.medicine_id} product={a} variant="alternative" selected={p.selectedId === a.medicine_id} onSelect={() => p.onSelect(a.medicine_id)} compareTo={current.mrp?.per_unit ?? null} />

@@ -32,12 +32,15 @@ export function MedicineCard({ product: p, variant, selected, onSelect, compareT
   const priced = p.mrp?.freshness === "current";
   const reviewed = p.review_status === "approved" && p.verification_status === "verified";
   const isJA = p.medicine_id.startsWith("ja_");
+  const isBrand = p.medicine_id.startsWith("real_");
+  const badge = isJA ? t.jaBadge : isBrand ? t.brandBadge : t.reviewedAlt;
+  const note = isJA ? t.jaNote : isBrand ? t.brandNote : t.reviewNote;
 
   const body = (
     <>
       <div className="med-head">
         <div className="med-id">
-          {variant === "current" ? <p className="med-kicker">{t.yours}</p> : reviewed && <Chip tone="ok" icon="shieldCheck">{isJA ? t.jaBadge : t.reviewedAlt}</Chip>}
+          {variant === "current" ? <p className="med-kicker">{t.yours}</p> : reviewed && <Chip tone="ok" icon="shieldCheck">{badge}</Chip>}
           <h3 className="med-name">{p.brand_name}</h3>
           {p.manufacturer && <p className="med-maker">{p.manufacturer}</p>}
         </div>
@@ -48,7 +51,7 @@ export function MedicineCard({ product: p, variant, selected, onSelect, compareT
         </div>
       </div>
       <Formulation p={p} />
-      {p.pack_quantity != null && <p className="med-pack">{t.pack(p.pack_quantity)}{variant === "alternative" && reviewed ? ` · ${isJA ? t.jaNote : t.reviewNote}` : ""}</p>}
+      {p.pack_quantity != null && <p className="med-pack">{t.pack(p.pack_quantity)}{variant === "alternative" && reviewed ? ` · ${note}` : ""}</p>}
       <PriceProvenance product={p} />
       {variant === "alternative" && (
         <>
