@@ -22,6 +22,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var identify_exports = {};
 __export(identify_exports, {
   INSTRUCTIONS: () => INSTRUCTIONS,
+  NAME_INSTRUCTIONS: () => NAME_INSTRUCTIONS,
   default: () => handler
 });
 module.exports = __toCommonJS(identify_exports);
@@ -31,15 +32,28 @@ var MAX_DATA_URL_CHARS = 4e6;
 var INSTRUCTIONS = `You read medicine packaging photographed by a user in India.
 Extract ONLY what is printed on the pack. Never guess, infer or fill in from general knowledge.
 
-- brand_name: the trade name exactly as printed, without the strength unless it is part of the name (e.g. "Cetimac").
+- brand_name: the trade name exactly as printed, without the strength unless it is part of the name (e.g. "Cetimac"). If the pack has no trade name and is sold under its salt name (e.g. "Cetirizine Tablets IP 10 mg"), give the salt name.
+- manufacturer: the company that markets the product ("Marketed by"), or the manufacturer if no marketer is printed, e.g. "Cadila Pharmaceuticals Ltd".
 - active_ingredients: the salt name(s) as printed, joined with " + " for combinations. Drop pharmacopoeia marks like I.P., B.P., U.S.P. (e.g. "Cetirizine").
 - strength: amount per unit with unit, e.g. "10 mg" or "40 mg + 12.5 mg".
 - dosage_form: "Tablet", "Capsule", or "Other".
 - release_type: use a code ONLY if a release marking is printed: SR (sustained), ER (ER/XR/extended/prolonged), MR (MR/CR/modified/controlled), DR (DR/EC/delayed/enteric-coated), IR only if "immediate release" is printed. If no marking is printed, value null and read "not_found".
 - read: "clear" if the text is plainly legible, "unclear" if partly obscured, blurred or you are not certain, "not_found" if not visible (value null).
 - is_medicine_pack: false if the photo is not a medicine strip, bottle or box; then set every value null and read "not_found".
+- recognized: same as is_medicine_pack.
 Return JSON only. Do not give any medical advice.`;
-var FIELDS = ["brand_name", "active_ingredients", "strength", "dosage_form", "release_type"];
+var NAME_INSTRUCTIONS = `A user in India typed the name of a medicine they buy. Identify the specific product sold in India under that name.
+- recognized: true only if you know a medicine product sold in India by this name (allow small spelling mistakes). false for anything else, for a name you do not know, or if you are unsure; then set every value null and read "not_found".
+- brand_name: the product's correct name, without the strength unless it is part of the name (e.g. "Telcure"). For a generic typed by salt, the salt name.
+- manufacturer: the company that markets it, if you know it; otherwise null.
+- active_ingredients: the salt(s), joined with " + " for combinations (e.g. "Telmisartan").
+- strength: per unit with unit (e.g. "40 mg"). Use the strength typed by the user if given; if not typed and the product has several strengths, null.
+- dosage_form: "Tablet", "Capsule", or "Other".
+- release_type: SR, ER, MR or DR only if the product name or the product itself is sustained/extended/modified/delayed release (e.g. "SR", "XR", "CR", "OD", "EC" in the name); IR if it is a plain tablet or capsule; null if unsure.
+- read: "clear" if you are confident about that field, "unclear" if not, "not_found" when the value is null.
+- is_medicine_pack: true when recognized is true.
+Return JSON only. Do not give any medical advice.`;
+var FIELDS = ["brand_name", "manufacturer", "active_ingredients", "strength", "dosage_form", "release_type"];
 var ENUMS = { dosage_form: ["Tablet", "Capsule", "Other"], release_type: ["IR", "SR", "ER", "MR", "DR"] };
 var openaiField = (k) => ({
   type: "object",
@@ -53,8 +67,8 @@ var openaiField = (k) => ({
 var OPENAI_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["is_medicine_pack", ...FIELDS],
-  properties: { is_medicine_pack: { type: "boolean" }, ...Object.fromEntries(FIELDS.map((k) => [k, openaiField(k)])) }
+  required: ["is_medicine_pack", "recognized", ...FIELDS],
+  properties: { is_medicine_pack: { type: "boolean" }, recognized: { type: "boolean" }, ...Object.fromEntries(FIELDS.map((k) => [k, openaiField(k)])) }
 };
 var geminiField = (_k) => ({
   type: "OBJECT",
@@ -63,8 +77,8 @@ var geminiField = (_k) => ({
 });
 var GEMINI_SCHEMA = {
   type: "OBJECT",
-  required: ["is_medicine_pack", ...FIELDS],
-  properties: { is_medicine_pack: { type: "BOOLEAN" }, ...Object.fromEntries(FIELDS.map((k) => [k, geminiField(k)])) }
+  required: ["is_medicine_pack", "recognized", ...FIELDS],
+  properties: { is_medicine_pack: { type: "BOOLEAN" }, recognized: { type: "BOOLEAN" }, ...Object.fromEntries(FIELDS.map((k) => [k, geminiField(k)])) }
 };
 function pickProvider() {
   const gemini = process.env.GEMINI_API_KEY;
@@ -83,14 +97,22 @@ async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
   if (!chosen) return res.status(503).json({ error: "not_configured" });
   const body = typeof req.body === "string" ? safeParse(req.body) : req.body;
-  const image = body?.image;
-  const m = typeof image === "string" ? image.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,(.+)$/) : null;
-  if (!m) return res.status(400).json({ error: "bad_image" });
-  if (image.length > MAX_DATA_URL_CHARS) return res.status(413).json({ error: "too_large" });
   const { provider, key } = chosen;
+  let job;
+  if (typeof body?.text === "string") {
+    const text = body.text.replace(/\s+/g, " ").trim();
+    if (text.length < 2 || text.length > 80 || !/^[\p{L}\p{N} .,+\-/()%&']+$/u.test(text)) return res.status(400).json({ error: "bad_text" });
+    job = { instructions: NAME_INSTRUCTIONS, prompt: `Medicine name typed by the user: "${text}"` };
+  } else {
+    const image = body?.image;
+    const m = typeof image === "string" ? image.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,(.+)$/) : null;
+    if (!m) return res.status(400).json({ error: "bad_image" });
+    if (image.length > MAX_DATA_URL_CHARS) return res.status(413).json({ error: "too_large" });
+    job = { instructions: INSTRUCTIONS, prompt: "Extract the printed medicine details from this pack.", image: { dataUrl: image, mime: m[1], base64: m[2] } };
+  }
   const preferred = provider === "gemini" ? process.env.GEMINI_MODEL : process.env.OPENAI_MODEL;
   const models = Array.from(new Set([preferred, ...provider === "gemini" ? GEMINI_MODELS : OPENAI_MODELS].filter(Boolean)));
-  const call = (model) => provider === "gemini" ? callGemini(key, model, m[1], m[2]) : callOpenAI(key, model, image);
+  const call = (model) => provider === "gemini" ? callGemini(key, model, job) : callOpenAI(key, model, job);
   const skippable = (o) => o.status === 404 || o.code === "model_not_found" || o.code === "NOT_FOUND" || provider === "gemini" && o.status === 429;
   try {
     let model = models[0];
@@ -119,16 +141,16 @@ async function handler(req, res) {
 function scrub(s) {
   return s.replace(/sk-[A-Za-z0-9_\-*.]{2,}/g, "[key]").replace(/AIza[0-9A-Za-z_\-]{10,}/g, "[key]");
 }
-async function callOpenAI(key, model, image) {
+async function callOpenAI(key, model, job) {
   const r = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
-      instructions: INSTRUCTIONS,
+      instructions: job.instructions,
       input: [{ role: "user", content: [
-        { type: "input_text", text: "Extract the printed medicine details from this pack." },
-        { type: "input_image", image_url: image, detail: "high" }
+        { type: "input_text", text: job.prompt },
+        ...job.image ? [{ type: "input_image", image_url: job.image.dataUrl, detail: "high" }] : []
       ] }],
       text: { format: { type: "json_schema", name: "medicine_pack", strict: true, schema: OPENAI_SCHEMA } },
       store: false
@@ -139,15 +161,15 @@ async function callOpenAI(key, model, image) {
   for (const item of data?.output ?? []) for (const part of item?.content ?? []) if (!text && part?.type === "output_text") text = part.text;
   return { ok: r.ok, status: r.status, code: String(data?.error?.code ?? data?.error?.type ?? ""), message: String(data?.error?.message ?? ""), text };
 }
-async function callGemini(key, model, mime, base64) {
+async function callGemini(key, model, job) {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
+      systemInstruction: { parts: [{ text: job.instructions }] },
       contents: [{ role: "user", parts: [
-        { text: "Extract the printed medicine details from this pack." },
-        { inline_data: { mime_type: mime, data: base64 } }
+        { text: job.prompt },
+        ...job.image ? [{ inline_data: { mime_type: job.image.mime, data: job.image.base64 } }] : []
       ] }],
       generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: GEMINI_SCHEMA }
     })
@@ -165,6 +187,7 @@ function safeParse(s) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  INSTRUCTIONS
+  INSTRUCTIONS,
+  NAME_INSTRUCTIONS
 });
 module.exports = module.exports.default;

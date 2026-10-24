@@ -5,6 +5,7 @@ import { DEMO } from "./lib/mode";
 import { inr } from "./lib/format";
 import { SavedMed, loadSaved, storeSaved } from "./lib/savedMeds";
 import { extractionFromRecord } from "./domain/verification";
+import { isSaltName } from "./domain/normalize";
 import { calculateSavings, comparableBases } from "./domain/pricing";
 import { buildSummary, ConfirmedHow } from "./summary/buildSummary";
 import { ScenarioId } from "./mock/scenarios";
@@ -50,7 +51,9 @@ export function App() {
   const [manualOpen, setManualOpen] = useState(false);
 
   // Screen 2
-  const [source, setSource] = useState<"photo" | "manual">("photo");
+  const [source, setSource] = useState<"photo" | "manual" | "name">("photo");
+  /** What was identified beyond the checked fields: the company, and how it was identified. */
+  const [maker, setMaker] = useState<string | null>(null);
   const [extraction, setExtraction] = useState<Extraction | null>(null);
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [chosenId, setChosenId] = useState<string | null>(null);
@@ -107,7 +110,7 @@ export function App() {
   // ---- downstream resets: changing an earlier answer clears what depended on it
   const clearFromComparison = () => { setConfirmed(null); setComparison(null); setSelectedId(null); setUnitsPerDay(null); setBasis("MRP"); setSummaryReady(false); };
 
-  const applyVerification = (src: "photo" | "manual", ex: Extraction, v: VerificationResult) => {
+  const applyVerification = (src: "photo" | "manual" | "name", ex: Extraction, v: VerificationResult) => {
     setSource(src);
     setExtraction(ex);
     setResult(v);
@@ -146,8 +149,10 @@ export function App() {
     setPhase("reading");
     try {
       const useVision = live && visionLive && !!photo?.file;
-      const ex = useVision ? await api.identifyWithVision(photo!.file!) : await api.identifyFromPhoto(null, scenario);
+      const out = useVision ? await api.identifyWithVision(photo!.file!) : { extraction: await api.identifyFromPhoto(null, scenario), maker: null };
+      const ex = out.extraction;
       setReadBy(useVision ? "vision" : "simulated");
+      setMaker(out.maker);
       setPhase("catalogue");
       await wait(350);
       setPhase("verifying");
@@ -166,6 +171,7 @@ export function App() {
     try {
       const ex = extractionFromRecord(m);
       const v = await api.verify(ex);
+      setMaker(m.manufacturer);
       applyVerification("manual", ex, v);
       setStep(2);
     } catch {
@@ -173,6 +179,16 @@ export function App() {
     } finally {
       setPhase(null);
     }
+  };
+
+  /** A typed name that isn't in the catalogue: AI identifies it, then the Verification Layer runs as for a photo. */
+  const identifyName = async (name: string) => {
+    const out = await api.identifyByName(name);
+    const v = await api.verify(out.extraction);
+    setReadBy("vision");
+    setMaker(out.maker);
+    applyVerification("name", out.extraction, v);
+    setStep(2);
   };
 
   // ---- Screen 2 actions
@@ -200,9 +216,11 @@ export function App() {
 
   /** Brand not listed: compare the formulation the customer confirmed, priced from their own pack. */
   const compareByPack = async (f: Formulation, mrp: number, pack: number, brandName?: string) => {
-    const brand = brandName || extraction?.brand_name.value || t.packDefaultName;
+    const read = extraction?.brand_name.value ?? null;
+    const generic = isSaltName(read, extraction?.active_ingredients.value ?? null);
+    const brand = brandName || (read && !generic ? read : t.genericName(f.active_ingredients.join(" + "), f.strength));
     const today = new Date().toISOString().slice(0, 10);
-    const record: MedicineRecord = { medicine_id: "user_pack", brand_name: brand, manufacturer: null, ...f, verification_status: "verified", review_status: "pending" };
+    const record: MedicineRecord = { medicine_id: "user_pack", brand_name: brand, manufacturer: brandName ? null : maker, ...f, verification_status: "verified", review_status: "pending" };
     const quote: PriceQuote = { price_type: "MRP", amount: mrp, pack_quantity: pack, price_source: "user_pack", verification_status: "verified", last_verified_at: today, freshness: "current", per_unit: mrp / pack };
     const currentP: ComparableProduct = { ...record, mrp: quote, actual_selling_price: null, pack_quantity: pack, price_source: "user_pack", last_verified_at: today };
     clearFromComparison();
@@ -253,7 +271,7 @@ export function App() {
   const reset = () => {
     onRemove();
     setFileError(null); setScenario("matched"); setManualOpen(false);
-    setExtraction(null); setResult(null); setChosenId(null); setAck(false); setEditing(false);
+    setExtraction(null); setResult(null); setChosenId(null); setAck(false); setEditing(false); setMaker(null);
     clearFromComparison(); setPackInfo(null); setSort("price"); setStep(1);
   };
 
@@ -271,7 +289,7 @@ export function App() {
     screen = (
       <VerifyScreen
         key={verifyKey}
-        headRef={headRef} source={source} readBy={readBy} aiName={aiName} photo={photo} result={result}
+        headRef={headRef} source={source} readBy={readBy} aiName={aiName} photo={photo} result={result} extraction={extraction} maker={maker} onNew={reset}
         chosenId={chosenId} setChosenId={(id) => { setChosenId(id); }} ack={ack} setAck={setAck}
         editing={editing} draft={draft ?? extraction} setDraft={setDraft}
         startEdit={() => { setDraft(JSON.parse(JSON.stringify(extraction))); setEditing(true); }}
@@ -331,7 +349,7 @@ export function App() {
       <HomeScreen
         headRef={headRef} pickerRef={pickerRef} photo={photo} fileError={fileError} onFile={onFile} onRemove={onRemove}
         scenario={scenario} setScenario={setScenario} onSample={onSample} phase={phase} identifyError={identifyError} onIdentify={identify} aiName={aiName}
-        manualOpen={manualOpen} setManualOpen={setManualOpen} onManualPick={onManualPick}
+        manualOpen={manualOpen} setManualOpen={setManualOpen} onManualPick={onManualPick} onIdentifyName={visionLive ? identifyName : undefined}
         demo={DEMO} saved={saved} onRecheck={recheckSaved} onRemoveSaved={removeSaved} checks={checks}
       />
     );

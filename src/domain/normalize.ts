@@ -97,3 +97,13 @@ export function normalizeForm(s: string): string {
   if (k.startsWith("cap")) return "Capsule";
   return s.trim();
 }
+
+const SALT_NOISE = new Set(["tablet", "tablets", "capsule", "capsules", "ip", "bp", "usp", "mg", "mcg", "hydrochloride", "hcl", "sodium", "potassium", "calcium", "maleate", "besylate", "besilate", "dihydrochloride", "tartrate", "succinate", "film", "coated"]);
+const saltTokens = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter((w) => w.length > 1 && !SALT_NOISE.has(w)).map((w) => canonicalSalt(w));
+
+/** True when a "brand" read from a pack is just the salt name (a generic sold without a trade name). */
+export function isSaltName(brand: string | null, ingredients: string | null): boolean {
+  if (!brand || !ingredients) return false;
+  const b = saltTokens(brand), ing = new Set(saltTokens(ingredients));
+  return b.length > 0 && b.every((w) => ing.has(w));
+}

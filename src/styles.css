@@ -642,3 +642,17 @@ details[open] .chev { transform: rotate(180deg); }
 /* Alternative-type filter: sized to its labels so they stay on one line on small phones. */
 .alt-filter .seg { display: flex !important; }
 .alt-filter .seg-btn { flex: 1 1 auto; white-space: nowrap; font-size: 14px; padding-left: 10px; padding-right: 10px; }
+
+/* Identified medicine (shown even when it isn't in the catalogue) */
+.id-card { display: flex; flex-direction: column; gap: 6px; }
+.id-kicker { margin: 0; display: inline-flex; align-items: center; gap: 6px; color: var(--mint-ink); font-weight: 650; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+.id-name { margin: 0; font-size: 22px; line-height: 1.25; }
+.id-facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 8px 0 0; font-size: 15px; }
+.id-facts dt { color: var(--muted); }
+.id-facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.search-identify { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.search-identify p { margin: 0; }
+.search-id-error { color: var(--crit); font-size: 14px; }
+/* The hint above the sticky button sits on a solid background so page text doesn't show through it. */
+.action-bar { background: var(--bg); box-shadow: 0 -10px 12px -6px var(--bg); }
+@media (min-width: 1000px) { .action-bar { background: none; box-shadow: none; } }

@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import handler from "../functions/identify";
 delete process.env.GEMINI_API_KEY; delete process.env.VISION_PROVIDER;
-import { toExtraction } from "../src/api/client";
+import { toExtraction, toIdentified } from "../src/api/client";
+import { isSaltName } from "../src/domain/normalize";
 
 type Captured = { url?: string; init?: any };
 function mockRes() {
@@ -162,6 +163,40 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
     await handler({ method: "GET" }, res);
     assert.equal(out.body.provider, "openai");
     delete process.env.VISION_PROVIDER;
+  });
+
+
+  await test("typed name: sends the name (no image) with the name instructions to Gemini; company is returned", async () => {
+    process.env.GEMINI_API_KEY = "AIzaTESTKEY0123456789"; delete process.env.VISION_PROVIDER;
+    const cap: Captured = {};
+    const result = { is_medicine_pack: true, recognized: true, brand_name: { value: "Telcure", read: "clear" }, manufacturer: { value: "Example Pharma Ltd", read: "clear" }, active_ingredients: { value: "Telmisartan", read: "clear" }, strength: { value: "40 mg", read: "clear" }, dosage_form: { value: "Tablet", read: "clear" }, release_type: { value: "IR", read: "clear" } };
+    (globalThis as any).fetch = async (url: string, init: any) => { cap.url = url; cap.init = init; return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] }) }; };
+    const { res, out } = mockRes();
+    await handler({ method: "POST", body: { text: "Telcure 40" } }, res);
+    const sent = JSON.parse(cap.init.body);
+    assert.equal(sent.contents[0].parts.length, 1);
+    assert.match(sent.contents[0].parts[0].text, /Telcure 40/);
+    assert.match(sent.systemInstruction.parts[0].text, /typed the name of a medicine/);
+    assert.equal(out.code, 200);
+    const id = toIdentified(out.body.result);
+    assert.equal(id.maker, "Example Pharma Ltd");
+    assert.equal(id.extraction.active_ingredients.value, "Telmisartan");
+  });
+
+  await test("typed name: rejects empty, very long or script-like input", async () => {
+    for (const text of ["", "x", "a".repeat(81), "<script>alert(1)</script>"]) {
+      const { res, out } = mockRes();
+      await handler({ method: "POST", body: { text } }, res);
+      assert.equal(out.code, 400, text);
+      assert.equal(out.body.error, "bad_text");
+    }
+  });
+
+  await test("a pack sold under its salt name is recognised as a generic", async () => {
+    assert.equal(isSaltName("CETIRIZINE", "Cetirizine Hydrochloride"), true);
+    assert.equal(isSaltName("Cetirizine Tablets IP 10 mg", "Cetirizine"), true);
+    assert.equal(isSaltName("Cetimac", "Cetirizine"), false);
+    assert.equal(isSaltName("Telma 40", "Telmisartan"), false);
   });
 
   globalThis.fetch = realFetch;

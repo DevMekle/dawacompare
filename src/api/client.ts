@@ -10,7 +10,10 @@ import { photoToDataUrl } from "../lib/image";
 import { createSeedStore, CatalogueInfo } from "../catalogue/store";
 import { comparisonWithStore, formulationComparisonWithStore, searchWithStore, verifyWithStore } from "../catalogue/service";
 
-export type VisionError = "not_medicine" | "too_large" | "decode_failed" | "busy" | "vision_failed";
+export type VisionError = "not_medicine" | "not_recognised" | "too_large" | "decode_failed" | "busy" | "vision_failed";
+
+/** What the AI identified: the fields the Verification Layer checks, plus the company name for display. */
+export interface Identified { extraction: Extraction; maker: string | null }
 
 /** Only reasons the customer can act on are distinguished; every service-side problem is "vision_failed". */
 function visionErrorFrom(j: any): VisionError {
@@ -32,13 +35,20 @@ export function toExtraction(r: any): Extraction {
   return { brand_name: f("brand_name"), active_ingredients: f("active_ingredients"), strength: f("strength"), dosage_form: f("dosage_form"), release_type: f("release_type") };
 }
 
+export function toIdentified(r: any): Identified {
+  const m = typeof r?.manufacturer?.value === "string" ? r.manufacturer.value.trim() : "";
+  return { extraction: toExtraction(r), maker: m || null };
+}
+
 export interface DawaApi {
   /** Planned: POST /api/identify (multipart photo) → backend calls OpenAI Vision → Extraction. */
   identifyFromPhoto(photo: Blob | null, demoScenario: ScenarioId): Promise<Extraction>;
   /** The configured vision provider ("gemini" | "openai") on this deployment, or null. */
   visionAvailable(): Promise<string | null>;
-  /** POST /api/identify: real reading by OpenAI Vision. Rejects with Error(VisionError). */
-  identifyWithVision(photo: Blob): Promise<Extraction>;
+  /** POST /api/identify {image}: real reading by the vision model. Rejects with Error(VisionError). */
+  identifyWithVision(photo: Blob): Promise<Identified>;
+  /** POST /api/identify {text}: identifies a typed medicine name that isn't in the catalogue. Rejects with Error(VisionError). */
+  identifyByName(name: string): Promise<Identified>;
   /** Which catalogue answers: the deployment's database/API, or the copy bundled in the page. */
   catalogueInfo(): Promise<CatalogueInfo & { via: "api" | "bundled" }>;
   /** POST /api/catalogue {action:"verify"}: Verification Layer against the medicines table. */
@@ -125,7 +135,23 @@ export const mockApi: DawaApi = {
     const j: any = await r.json().catch(() => null);
     if (!r.ok) throw new Error(visionErrorFrom(j));
     if (j?.result?.is_medicine_pack === false) throw new Error("not_medicine");
-    return toExtraction(j?.result);
+    return toIdentified(j?.result);
+  },
+
+  async identifyByName(name) {
+    let r: Response;
+    try {
+      r = await fetch("/api/identify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: name }) });
+    } catch {
+      throw new Error("vision_failed");
+    }
+    const j: any = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(j?.error === "bad_text" ? "not_recognised" : visionErrorFrom(j));
+    const out = toIdentified(j?.result);
+    if (j?.result?.recognized === false || !out.extraction.active_ingredients.value) throw new Error("not_recognised");
+    // Identified from general knowledge, not read from a pack: every field must be checked by the customer.
+    for (const k of Object.keys(out.extraction) as (keyof Extraction)[]) if (out.extraction[k].value) out.extraction[k].read = "unclear";
+    return out;
   },
 
   async catalogueInfo() {

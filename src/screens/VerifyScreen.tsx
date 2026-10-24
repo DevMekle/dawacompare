@@ -6,10 +6,38 @@ import { Icon } from "../components/Icon";
 import { ActionBar, Notice, ScreenHead, StatusBanner, Spinner } from "../components/ui";
 import { VerificationChecks, CandidatePicker, FieldEditor } from "../components/VerificationPanel";
 import { Photo } from "../components/UploadPanel";
+import { isSaltName } from "../domain/normalize";
+
+/** What the AI identified, shown even when the medicine isn't in the catalogue. */
+function IdentityCard({ ex, maker }: { ex: Extraction; maker: string | null }) {
+  const { t } = useI18n();
+  const brand = ex.brand_name.value, salt = ex.active_ingredients.value, strength = ex.strength.value;
+  const generic = isSaltName(brand, salt);
+  const name = generic || !brand ? [salt, strength].filter(Boolean).join(" ") : brand;
+  const form = ex.dosage_form.value ? (t.forms as Record<string, string>)[ex.dosage_form.value] ?? ex.dosage_form.value : t.idNotFound;
+  const rel = ex.release_type.value ? (t.releases as Record<string, string>)[ex.release_type.value] ?? ex.release_type.value : t.idReleaseNone;
+  return (
+    <div className="card id-card">
+      <p className="id-kicker"><Icon name="circleCheck" size={16} />{t.idKicker}</p>
+      <h2 className="id-name">{name}</h2>
+      {generic && <p className="muted small">{t.idGeneric}</p>}
+      <dl className="id-facts">
+        {maker && <><dt>{t.idCompany}</dt><dd>{maker}</dd></>}
+        <dt>{t.idSalt}</dt><dd>{salt ?? t.idNotFound}</dd>
+        <dt>{t.idStrength}</dt><dd>{strength ?? t.idNotFound}</dd>
+        <dt>{t.idForm}</dt><dd>{form}</dd>
+        <dt>{t.idRelease}</dt><dd>{rel}</dd>
+      </dl>
+    </div>
+  );
+}
 
 interface Props {
   headRef: any;
-  source: "photo" | "manual";
+  source: "photo" | "manual" | "name";
+  extraction: Extraction;
+  maker: string | null;
+  onNew: () => void;
   readBy: "vision" | "simulated";
   aiName: string | null;
   photo: Photo | null;
@@ -48,8 +76,11 @@ export function VerifyScreen(p: Props) {
   const toCheck = r.checks.filter((c) => c.result === "unclear" || c.result === "missing").map((c) => t.fields[c.field].toLowerCase());
   const ok = canConfirm(r, p.chosenId, p.ack);
 
-  // Compare by salt (brand not in catalogue, formulation is)
-  const matches = r.status === "unable" && r.reason === "no_record" ? r.formulation_matches ?? [] : [];
+  // Not in the catalogue: show what was identified, then compare by salt (formulation listed) or say we have no data.
+  const noRecord = r.status === "unable" && r.reason === "no_record" && p.source !== "manual";
+  const matches = noRecord ? r.formulation_matches ?? [] : [];
+  const needStrength = noRecord && !p.extraction.strength.value;
+  const noData = noRecord && matches.length === 0 && !needStrength;
   const releaseOptions = Array.from(new Set(matches.map((m) => m.release_type))) as ReleaseType[];
   const [packRelease, setPackRelease] = useState<ReleaseType | null>(releaseOptions.length === 1 ? releaseOptions[0] : null);
   const [packMrp, setPackMrp] = useState("");
@@ -67,11 +98,15 @@ export function VerifyScreen(p: Props) {
     <section className="screen">
       <ScreenHead headRef={p.headRef} title={t.s2Title} body={t.s2Body} />
 
+      {!p.editing && !p.rechecking && noRecord && <IdentityCard ex={p.extraction} maker={p.maker} />}
+
       {p.rechecking ? (
         <div className="banner banner-info" role="status"><span className="banner-icon"><Spinner /></span><div className="banner-text"><strong>{t.phases.verifying}</strong></div></div>
       ) : (
         matches.length > 0
-          ? <StatusBanner tone="warn" icon="help" title={t.packBannerTitle} body={t.packBannerBody} />
+          ? <StatusBanner tone="info" icon="info" title={t.packBannerTitle} body={t.packBannerBody} />
+          : needStrength ? <StatusBanner tone="warn" icon="help" title={t.needStrengthTitle} body={t.needStrengthBody} />
+          : noData ? <StatusBanner tone="info" icon="info" title={t.noDataTitle} body={t.noDataBody} />
           : <StatusBanner tone={TONE[r.status]} icon={ICON[r.status]} title={title} body={r.status === "unable" && r.reason ? t.unableReasons[r.reason] : body} />
       )}
 
@@ -104,7 +139,7 @@ export function VerifyScreen(p: Props) {
 
       <div className="source-row">
         {p.photo && p.source === "photo" && <img src={p.photo.url} alt="" />}
-        <span className="muted small"><Icon name={p.source === "photo" ? "scan" : "keyboard"} size={14} />{p.source === "manual" ? t.fromManual : p.readBy === "vision" ? withAi(t.fromVision, p.aiName) : t.fromPhoto}</span>
+        <span className="muted small"><Icon name={p.source === "manual" ? "keyboard" : "scan"} size={14} />{p.source === "manual" ? t.fromManual : p.source === "name" ? t.fromName : p.readBy === "vision" ? withAi(t.fromVision, p.aiName) : t.fromPhoto}</span>
       </div>
 
       {p.editing ? (
@@ -112,7 +147,7 @@ export function VerifyScreen(p: Props) {
           <FieldEditor draft={p.draft} onChange={p.setDraft} />
           <Notice tone="info" icon="pencil">{t.editedNote}</Notice>
         </div>
-      ) : (
+      ) : noRecord ? null : (
         <>
           <VerificationChecks checks={r.checks} />
           <p className="muted small read-note"><Icon name="info" size={14} />{t.readNote}</p>
@@ -134,7 +169,7 @@ export function VerifyScreen(p: Props) {
       <ActionBar
         hint={
           !p.editing && matches.length > 0 && !packOk ? <p className="bar-hint">{t.packNeed}</p>
-          : !p.editing && r.status === "unable" && matches.length === 0 ? <p className="bar-hint">{t.blockedHint}</p>
+          : !p.editing && r.status === "unable" && !noData && matches.length === 0 ? <p className="bar-hint">{t.blockedHint}</p>
           : !p.editing && r.status === "needs_confirmation" && !ok ? <p className="bar-hint">{t.pickHint}</p>
           : null
         }
@@ -143,6 +178,10 @@ export function VerifyScreen(p: Props) {
           <button type="button" className="btn btn-primary" onClick={p.onRecheck} disabled={p.rechecking}><Icon name="shieldCheck" size={20} />{t.checkAgain}</button>
         ) : matches.length > 0 ? (
           <button type="button" className={`btn btn-primary ${packOk ? "" : "is-blocked"}`} aria-disabled={!packOk} onClick={comparePack}><Icon name="arrowRight" size={20} />{t.packCta}</button>
+        ) : needStrength ? (
+          <button type="button" className="btn btn-primary" onClick={p.startEdit}><Icon name="pencil" size={20} />{t.needStrengthCta}</button>
+        ) : noData ? (
+          <button type="button" className="btn btn-primary" onClick={p.onNew}><Icon name="rotate" size={20} />{t.noDataCta}</button>
         ) : r.status === "unable" ? (
           p.source === "photo"
             ? <button type="button" className="btn btn-primary" onClick={p.onRetake}><Icon name="camera" size={20} />{t.retakeCta}</button>

@@ -31,6 +31,7 @@ interface Props {
   manualOpen: boolean;
   setManualOpen: (v: boolean) => void;
   onManualPick: (m: MedicineRecord) => void;
+  onIdentifyName?: (name: string) => Promise<void>;
   /** Demo mode shows sample packs and simulated readings. */
   demo: boolean;
   saved: SavedMed[];
@@ -130,7 +131,7 @@ export function HomeScreen(p: Props) {
           <button type="button" className="link-btn" aria-expanded={p.manualOpen} aria-controls="manual-panel" onClick={() => p.setManualOpen(!p.manualOpen)}>
             <Icon name="keyboard" size={18} />{t.manualToggle}<Icon name="chevronDown" size={16} className={p.manualOpen ? "rot" : ""} />
           </button>
-          {p.manualOpen && <div id="manual-panel"><ManualSearch onPick={p.onManualPick} autoFocus /></div>}
+          {p.manualOpen && <div id="manual-panel"><ManualSearch onPick={p.onManualPick} onIdentifyName={p.onIdentifyName} autoFocus /></div>}
 
           {p.demo && (
             <>
