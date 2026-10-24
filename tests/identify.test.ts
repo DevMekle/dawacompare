@@ -62,14 +62,40 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
   });
 
   await test("upstream error becomes vision_failed (key never echoed)", async () => {
-    (globalThis as any).fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: "bad key" } }) });
+    (globalThis as any).fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { code: "invalid_api_key", message: "Incorrect API key provided: sk-test. You can find your API key at ..." } }) });
     const { res, out } = mockRes();
     const err = console.error; console.error = () => {};
     await handler({ method: "POST", body: { image: IMG } }, res);
     console.error = err;
     assert.equal(out.code, 502);
     assert.equal(out.body.error, "vision_failed");
+    assert.equal(out.body.code, "invalid_api_key");
     assert.ok(!JSON.stringify(out.body).includes("sk-test"));
+  });
+
+  await test("falls back to a second model when the first isn't available", async () => {
+    const models: string[] = [];
+    (globalThis as any).fetch = async (_u: string, init: any) => {
+      const m = JSON.parse(init.body).model; models.push(m);
+      if (models.length === 1) return { ok: false, status: 404, json: async () => ({ error: { code: "model_not_found", message: "no" } }) };
+      return { ok: true, status: 200, json: async () => ({ output_text: JSON.stringify({ is_medicine_pack: false, brand_name: { value: null, read: "not_found" }, active_ingredients: { value: null, read: "not_found" }, strength: { value: null, read: "not_found" }, dosage_form: { value: null, read: "not_found" }, release_type: { value: null, read: "not_found" } }) }) };
+    };
+    const { res, out } = mockRes();
+    const err = console.error; console.error = () => {};
+    await handler({ method: "POST", body: { image: IMG } }, res);
+    console.error = err;
+    assert.equal(models.length, 2);
+    assert.equal(out.code, 200);
+    assert.equal(out.body.model, "gpt-4.1-mini");
+  });
+
+  await test("no credit is reported as insufficient_quota", async () => {
+    (globalThis as any).fetch = async () => ({ ok: false, status: 429, json: async () => ({ error: { code: "insufficient_quota", message: "You exceeded your current quota" } }) });
+    const { res, out } = mockRes();
+    const err = console.error; console.error = () => {};
+    await handler({ method: "POST", body: { image: IMG } }, res);
+    console.error = err;
+    assert.equal(out.body.code, "insufficient_quota");
   });
 
   globalThis.fetch = realFetch;

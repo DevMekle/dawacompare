@@ -9,6 +9,8 @@
 // GET /api/identify returns { configured: boolean } so the app knows whether live reading is available.
 
 const DEFAULT_MODEL = "gpt-5.4-mini";
+/** Tried once if the first model is not available to this API key. */
+const FALLBACK_MODEL = "gpt-4.1-mini";
 const MAX_DATA_URL_CHARS = 4_000_000; // stays under Vercel's 4.5 MB request limit
 
 const field = (valueSchema: object) => ({
@@ -75,8 +77,36 @@ export default async function handler(req: Req, res: Res) {
   }
   if (image.length > MAX_DATA_URL_CHARS) return res.status(413).json({ error: "too_large" });
 
-  const model = process.env.OPENAI_MODEL || DEFAULT_MODEL;
+  const first = process.env.OPENAI_MODEL || DEFAULT_MODEL;
   try {
+    let model = first;
+    let { r, data } = await callOpenAI(key, model, image);
+    if (!r.ok && (data?.error?.code === "model_not_found" || r.status === 404) && first !== FALLBACK_MODEL) {
+      model = FALLBACK_MODEL;
+      ({ r, data } = await callOpenAI(key, model, image));
+    }
+    if (!r.ok) {
+      const code = String(data?.error?.code ?? data?.error?.type ?? "");
+      console.error("OpenAI error", r.status, code, data?.error?.message);
+      // Pass back only OpenAI's error code and a key-free message so the app can explain the failure.
+      return res.status(502).json({ error: "vision_failed", status: r.status, code, detail: scrub(String(data?.error?.message ?? "")).slice(0, 200), model });
+    }
+    const text = outputText(data);
+    const parsed = text ? safeParse(text) : null;
+    if (!parsed) return res.status(502).json({ error: "vision_unreadable", model });
+    return res.status(200).json({ model, result: parsed });
+  } catch (e) {
+    console.error("identify failed", e);
+    return res.status(502).json({ error: "vision_failed", code: "network" });
+  }
+}
+
+/** Removes anything that looks like an API key from text we return. */
+function scrub(s: string): string {
+  return s.replace(/sk-[A-Za-z0-9_\-*.]{2,}/g, "[key]");
+}
+
+async function callOpenAI(key: string, model: string, image: string) {
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -97,18 +127,7 @@ export default async function handler(req: Req, res: Res) {
       }),
     });
     const data: any = await r.json().catch(() => null);
-    if (!r.ok) {
-      console.error("OpenAI error", r.status, data?.error?.message);
-      return res.status(502).json({ error: "vision_failed", status: r.status });
-    }
-    const text = outputText(data);
-    const parsed = text ? safeParse(text) : null;
-    if (!parsed) return res.status(502).json({ error: "vision_unreadable" });
-    return res.status(200).json({ model, result: parsed });
-  } catch (e) {
-    console.error("identify failed", e);
-    return res.status(502).json({ error: "vision_failed" });
-  }
+    return { r, data };
 }
 
 function safeParse(s: string): any {

@@ -25,6 +25,7 @@ __export(identify_exports, {
 });
 module.exports = __toCommonJS(identify_exports);
 var DEFAULT_MODEL = "gpt-5.4-mini";
+var FALLBACK_MODEL = "gpt-4.1-mini";
 var MAX_DATA_URL_CHARS = 4e6;
 var field = (valueSchema) => ({
   type: "object",
@@ -80,40 +81,53 @@ async function handler(req, res) {
     return res.status(400).json({ error: "bad_image" });
   }
   if (image.length > MAX_DATA_URL_CHARS) return res.status(413).json({ error: "too_large" });
-  const model = process.env.OPENAI_MODEL || DEFAULT_MODEL;
+  const first = process.env.OPENAI_MODEL || DEFAULT_MODEL;
   try {
-    const r = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        instructions: INSTRUCTIONS,
-        input: [
-          {
-            role: "user",
-            content: [
-              { type: "input_text", text: "Extract the printed medicine details from this pack." },
-              { type: "input_image", image_url: image, detail: "high" }
-            ]
-          }
-        ],
-        text: { format: { type: "json_schema", name: "medicine_pack", strict: true, schema: SCHEMA } },
-        store: false
-      })
-    });
-    const data = await r.json().catch(() => null);
+    let model = first;
+    let { r, data } = await callOpenAI(key, model, image);
+    if (!r.ok && (data?.error?.code === "model_not_found" || r.status === 404) && first !== FALLBACK_MODEL) {
+      model = FALLBACK_MODEL;
+      ({ r, data } = await callOpenAI(key, model, image));
+    }
     if (!r.ok) {
-      console.error("OpenAI error", r.status, data?.error?.message);
-      return res.status(502).json({ error: "vision_failed", status: r.status });
+      const code = String(data?.error?.code ?? data?.error?.type ?? "");
+      console.error("OpenAI error", r.status, code, data?.error?.message);
+      return res.status(502).json({ error: "vision_failed", status: r.status, code, detail: scrub(String(data?.error?.message ?? "")).slice(0, 200), model });
     }
     const text = outputText(data);
     const parsed = text ? safeParse(text) : null;
-    if (!parsed) return res.status(502).json({ error: "vision_unreadable" });
+    if (!parsed) return res.status(502).json({ error: "vision_unreadable", model });
     return res.status(200).json({ model, result: parsed });
   } catch (e) {
     console.error("identify failed", e);
-    return res.status(502).json({ error: "vision_failed" });
+    return res.status(502).json({ error: "vision_failed", code: "network" });
   }
+}
+function scrub(s) {
+  return s.replace(/sk-[A-Za-z0-9_\-*.]{2,}/g, "[key]");
+}
+async function callOpenAI(key, model, image) {
+  const r = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      instructions: INSTRUCTIONS,
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: "Extract the printed medicine details from this pack." },
+            { type: "input_image", image_url: image, detail: "high" }
+          ]
+        }
+      ],
+      text: { format: { type: "json_schema", name: "medicine_pack", strict: true, schema: SCHEMA } },
+      store: false
+    })
+  });
+  const data = await r.json().catch(() => null);
+  return { r, data };
 }
 function safeParse(s) {
   try {

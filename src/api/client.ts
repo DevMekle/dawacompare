@@ -9,7 +9,19 @@ import { photoToDataUrl } from "../lib/image";
 import { createSeedStore, CatalogueInfo } from "../catalogue/store";
 import { comparisonWithStore, searchWithStore, verifyWithStore } from "../catalogue/service";
 
-export type VisionError = "not_medicine" | "too_large" | "decode_failed" | "not_configured" | "vision_failed";
+export type VisionError = "not_medicine" | "too_large" | "decode_failed" | "not_configured" | "vision_failed" | "no_credit" | "bad_key" | "rate_limited" | "model_unavailable";
+
+/** Maps OpenAI error codes (relayed by /api/identify) to messages the app can explain. */
+function visionErrorFrom(j: any): VisionError {
+  const code = String(j?.code ?? "");
+  if (j?.error === "too_large") return "too_large";
+  if (j?.error === "not_configured") return "not_configured";
+  if (code === "insufficient_quota" || code === "billing_hard_limit_reached") return "no_credit";
+  if (code === "invalid_api_key" || j?.status === 401) return "bad_key";
+  if (code === "rate_limit_exceeded" || j?.status === 429) return "rate_limited";
+  if (code === "model_not_found" || j?.status === 404) return "model_unavailable";
+  return "vision_failed";
+}
 
 const READS = ["clear", "unclear", "not_found"];
 
@@ -108,7 +120,11 @@ export const mockApi: DawaApi = {
       throw new Error("vision_failed");
     }
     const j: any = await r.json().catch(() => null);
-    if (!r.ok) throw new Error(j?.error === "too_large" ? "too_large" : j?.error === "not_configured" ? "not_configured" : "vision_failed");
+    if (!r.ok) {
+      const err: any = new Error(visionErrorFrom(j));
+      err.detail = [j?.status, j?.code, j?.detail].filter(Boolean).join(" · ");
+      throw err;
+    }
     if (j?.result?.is_medicine_pack === false) throw new Error("not_medicine");
     return toExtraction(j?.result);
   },
