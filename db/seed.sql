@@ -1,6 +1,7 @@
 -- DawaCompare SAMPLE catalogue. Generated from src/data/seed.ts by `npm run db:sql`; do not edit by hand.
 -- Salts, strengths, forms and release types are real common medicines.
--- Brand names, manufacturers, prices, sources and review statuses are FICTIONAL.
+-- Brand names, manufacturers, prices, sources and review statuses are FICTIONAL, except the rows with
+-- medicine_id starting "real_": real brands for identification, MRP from public online listings (dated).
 -- Dates are relative to the day you run this, so sample prices keep the same freshness.
 -- Re-running replaces all sample rows.
 
@@ -110,7 +111,20 @@ INSERT INTO medicines (medicine_id, brand_name, brand_family, manufacturer, acti
   ('med_lt4_50_1', 'Crevana 50', 'crevana', 'Yamuna Demo Labs', ARRAY['Levothyroxine']::text[], ARRAY['levothyroxine']::text[], '50 mcg', 'Tablet', 'IR', 'verified', 'approved'),
   ('med_lt4_50_2', 'Dorvia 50', 'dorvia', 'Teesta Demo Pharma', ARRAY['Levothyroxine']::text[], ARRAY['levothyroxine']::text[], '50 mcg', 'Tablet', 'IR', 'verified', 'rejected'),
   ('med_lt4_50_3', 'Elvexa 50', 'elvexa', 'Sutlej Demo Healthcare', ARRAY['Levothyroxine']::text[], ARRAY['levothyroxine']::text[], '50 mcg', 'Tablet', 'IR', 'verified', 'rejected'),
-  ('med_lt4_50_4', 'Fyrvana 50', 'fyrvana', 'Beas Demo Remedies', ARRAY['Levothyroxine']::text[], ARRAY['levothyroxine']::text[], '50 mcg', 'Tablet', 'IR', 'verified', 'pending');
+  ('med_lt4_50_4', 'Fyrvana 50', 'fyrvana', 'Beas Demo Remedies', ARRAY['Levothyroxine']::text[], ARRAY['levothyroxine']::text[], '50 mcg', 'Tablet', 'IR', 'verified', 'pending'),
+  ('med_pcmcaf_1', 'Gavexo 500/50', 'gavexo', 'Beas Demo Remedies', ARRAY['Paracetamol', 'Caffeine']::text[], ARRAY['caffeine', 'paracetamol']::text[], '500 mg + 50 mg', 'Tablet', 'IR', 'verified', 'approved'),
+  ('med_pcmcaf_2', 'Harvila 500/50', 'harvila', 'Kosi Demo Labs', ARRAY['Paracetamol', 'Caffeine']::text[], ARRAY['caffeine', 'paracetamol']::text[], '500 mg + 50 mg', 'Tablet', 'IR', 'verified', 'approved'),
+  ('med_pcmcaf_3', 'Inzora 500/50', 'inzora', 'Pennar Demo Pharma', ARRAY['Paracetamol', 'Caffeine']::text[], ARRAY['caffeine', 'paracetamol']::text[], '500 mg + 50 mg', 'Tablet', 'IR', 'verified', 'approved'),
+  ('med_pcmcaf_4', 'Jupexa 500/50', 'jupexa', 'Tungabhadra Demo Labs', ARRAY['Paracetamol', 'Caffeine']::text[], ARRAY['caffeine', 'paracetamol']::text[], '500 mg + 50 mg', 'Tablet', 'IR', 'verified', 'pending'),
+  ('med_prx20_1', 'Kalvora 20', 'kalvora', 'Tungabhadra Demo Labs', ARRAY['Piroxicam']::text[], ARRAY['piroxicam']::text[], '20 mg', 'Tablet', 'IR', 'verified', 'approved'),
+  ('med_prx20_2', 'Lomexa 20', 'lomexa', 'Periyar Demo Healthcare', ARRAY['Piroxicam']::text[], ARRAY['piroxicam']::text[], '20 mg', 'Tablet', 'IR', 'verified', 'approved'),
+  ('med_prx20_3', 'Mirvana 20', 'mirvana', 'Vindhya Demo Pharma', ARRAY['Piroxicam']::text[], ARRAY['piroxicam']::text[], '20 mg', 'Tablet', 'IR', 'verified', 'approved'),
+  ('med_prx20_4', 'Nexalo 20', 'nexalo', 'Arogya Demo Labs', ARRAY['Piroxicam']::text[], ARRAY['piroxicam']::text[], '20 mg', 'Tablet', 'IR', 'verified', 'approved'),
+  ('real_crocin_adv_500', 'Crocin Advance 500', 'crocin', 'GlaxoSmithKline Pharmaceuticals Ltd', ARRAY['Paracetamol']::text[], ARRAY['paracetamol']::text[], '500 mg', 'Tablet', 'IR', 'verified', 'pending'),
+  ('real_okacet_10', 'Okacet 10', 'okacet', 'Cipla Ltd', ARRAY['Cetirizine']::text[], ARRAY['cetirizine']::text[], '10 mg', 'Tablet', 'IR', 'verified', 'pending'),
+  ('real_dolonex_rapid_20', 'Dolonex Rapid 20', 'dolonex', 'Pfizer Ltd', ARRAY['Piroxicam']::text[], ARRAY['piroxicam']::text[], '20 mg', 'Tablet', 'IR', 'verified', 'pending'),
+  ('real_new_saridon', 'New Saridon', 'new', 'Bayer Pharmaceuticals Pvt Ltd', ARRAY['Paracetamol', 'Caffeine']::text[], ARRAY['caffeine', 'paracetamol']::text[], '500 mg + 50 mg', 'Tablet', 'IR', 'verified', 'pending'),
+  ('real_saridon', 'Saridon', 'saridon', NULL, ARRAY['Paracetamol', 'Propyphenazone', 'Caffeine']::text[], ARRAY['caffeine', 'paracetamol', 'propyphenazone']::text[], '250 mg + 150 mg + 50 mg', 'Tablet', 'IR', 'verified', 'pending');
 
 INSERT INTO price_records (price_id, medicine_id, price_type, amount, pack_quantity, price_source, verification_status, last_verified_at) VALUES
   ('pr_001', 'med_glucora_sr500', 'MRP', 40.00, 10, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 12),
@@ -248,6 +262,21 @@ INSERT INTO price_records (price_id, medicine_id, price_type, amount, pack_quant
   ('pr_lt4_50_2_mrp', 'med_lt4_50_2', 'MRP', 95.50, 100, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 28),
   ('pr_lt4_50_2_sp', 'med_lt4_50_2', 'SELLING_PRICE', 86.00, 100, 'sample_pharmacy_feed', 'verified', CURRENT_DATE - 4),
   ('pr_lt4_50_3_mrp', 'med_lt4_50_3', 'MRP', 122.00, 100, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 33),
-  ('pr_lt4_50_4_mrp', 'med_lt4_50_4', 'MRP', 77.50, 100, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 38);
+  ('pr_lt4_50_4_mrp', 'med_lt4_50_4', 'MRP', 77.50, 100, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 38),
+  ('pr_pcmcaf_1_mrp', 'med_pcmcaf_1', 'MRP', 48.00, 10, 'sample_pack_mrp', 'verified', CURRENT_DATE - 30),
+  ('pr_pcmcaf_1_sp', 'med_pcmcaf_1', 'SELLING_PRICE', 43.00, 10, 'sample_pharmacy_feed', 'verified', CURRENT_DATE - 5),
+  ('pr_pcmcaf_2_mrp', 'med_pcmcaf_2', 'MRP', 28.00, 10, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 35),
+  ('pr_pcmcaf_3_mrp', 'med_pcmcaf_3', 'MRP', 35.50, 10, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 40),
+  ('pr_pcmcaf_4_mrp', 'med_pcmcaf_4', 'MRP', 22.50, 10, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 5),
+  ('pr_prx20_1_mrp', 'med_prx20_1', 'MRP', 115.00, 10, 'sample_pack_mrp', 'verified', CURRENT_DATE - 37),
+  ('pr_prx20_1_sp', 'med_prx20_1', 'SELLING_PRICE', 103.50, 10, 'sample_pharmacy_feed', 'verified', CURRENT_DATE - 6),
+  ('pr_prx20_2_mrp', 'med_prx20_2', 'MRP', 66.50, 10, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 42),
+  ('pr_prx20_2_sp', 'med_prx20_2', 'SELLING_PRICE', 60.00, 10, 'sample_pharmacy_feed', 'verified', CURRENT_DATE - 6),
+  ('pr_prx20_3_mrp', 'med_prx20_3', 'MRP', 85.00, 10, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 186),
+  ('pr_prx20_4_mrp', 'med_prx20_4', 'MRP', 54.00, 10, 'sample_manufacturer_list', 'verified', CURRENT_DATE - 12),
+  ('pr_real_crocin_adv_500', 'real_crocin_adv_500', 'MRP', 19.31, 20, 'public_listing', 'verified', DATE '2026-10-24'),
+  ('pr_real_okacet_10', 'real_okacet_10', 'MRP', 19.73, 10, 'public_listing', 'verified', DATE '2026-10-24'),
+  ('pr_real_dolonex_rapid_20', 'real_dolonex_rapid_20', 'MRP', 136.15, 10, 'public_listing', 'verified', DATE '2026-10-24'),
+  ('pr_real_new_saridon', 'real_new_saridon', 'MRP', 55.00, 10, 'public_listing', 'verified', DATE '2026-10-24');
 
 COMMIT;

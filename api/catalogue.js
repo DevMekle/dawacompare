@@ -5494,7 +5494,10 @@ var GROUPS = [
   { key: "clp75", salts: ["Clopidogrel"], strength: "75 mg", form: "Tablet", release: "IR", pack: 15, refUnit: 8.1, states: ["ok_sp", "ok", "stale", "ok"] },
   { key: "ibu400", salts: ["Ibuprofen"], strength: "400 mg", form: "Tablet", release: "IR", pack: 15, refUnit: 1.6 },
   // Narrow therapeutic index: brand changes need clinical oversight, so alternatives are deliberately not approved.
-  { key: "lt4_50", salts: ["Levothyroxine"], strength: "50 mcg", form: "Tablet", release: "IR", pack: 100, refUnit: 1.65, states: ["ok_sp", "rejected", "rejected", "pending"] }
+  { key: "lt4_50", salts: ["Levothyroxine"], strength: "50 mcg", form: "Tablet", release: "IR", pack: 100, refUnit: 1.65, states: ["ok_sp", "rejected", "rejected", "pending"] },
+  // Sample alternatives for the real brands below.
+  { key: "pcmcaf", salts: ["Paracetamol", "Caffeine"], strength: "500 mg + 50 mg", form: "Tablet", release: "IR", pack: 10, refUnit: 4.8, states: ["ok_sp", "ok", "ok", "pending"] },
+  { key: "prx20", salts: ["Piroxicam"], strength: "20 mg", form: "Tablet", release: "IR", pack: 10, refUnit: 11.5, states: ["ok_sp", "ok", "stale", "ok"] }
 ];
 var DEFAULT_STATES = ["ok_sp", "ok", "ok", "stale"];
 var MULTIPLIERS = [1, 0.58, 0.74, 0.47];
@@ -5582,7 +5585,15 @@ var BRAND_POOL = [
   "Crevana",
   "Dorvia",
   "Elvexa",
-  "Fyrvana"
+  "Fyrvana",
+  "Gavexo",
+  "Harvila",
+  "Inzora",
+  "Jupexa",
+  "Kalvora",
+  "Lomexa",
+  "Mirvana",
+  "Nexalo"
 ];
 var MAKERS = [
   "Yamuna Demo Labs",
@@ -5650,10 +5661,28 @@ function generate() {
   return { medicines, prices };
 }
 var GENERATED = generate();
-var MEDICINES = [...CORE_MEDICINES, ...GENERATED.medicines];
-var PRICE_SEED = [...CORE_PRICES, ...GENERATED.prices];
+var PUBLIC_LISTING_DATE = "2026-10-24";
+var REAL_MEDICINES = [
+  { medicine_id: "real_crocin_adv_500", brand_name: "Crocin Advance 500", manufacturer: "GlaxoSmithKline Pharmaceuticals Ltd", active_ingredients: ["Paracetamol"], strength: "500 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+  { medicine_id: "real_okacet_10", brand_name: "Okacet 10", manufacturer: "Cipla Ltd", active_ingredients: ["Cetirizine"], strength: "10 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+  { medicine_id: "real_dolonex_rapid_20", brand_name: "Dolonex Rapid 20", manufacturer: "Pfizer Ltd", active_ingredients: ["Piroxicam"], strength: "20 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+  { medicine_id: "real_new_saridon", brand_name: "New Saridon", manufacturer: "Bayer Pharmaceuticals Pvt Ltd", active_ingredients: ["Paracetamol", "Caffeine"], strength: "500 mg + 50 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+  { medicine_id: "real_saridon", brand_name: "Saridon", manufacturer: null, active_ingredients: ["Paracetamol", "Propyphenazone", "Caffeine"], strength: "250 mg + 150 mg + 50 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" }
+];
+var REAL_PRICES = [
+  { price_id: "pr_real_crocin_adv_500", medicine_id: "real_crocin_adv_500", price_type: "MRP", amount: 19.31, pack_quantity: 20, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
+  { price_id: "pr_real_okacet_10", medicine_id: "real_okacet_10", price_type: "MRP", amount: 19.73, pack_quantity: 10, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
+  { price_id: "pr_real_dolonex_rapid_20", medicine_id: "real_dolonex_rapid_20", price_type: "MRP", amount: 136.15, pack_quantity: 10, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
+  { price_id: "pr_real_new_saridon", medicine_id: "real_new_saridon", price_type: "MRP", amount: 55, pack_quantity: 10, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE }
+  // Classic Saridon: no current listing found, so no price is stored.
+];
+var MEDICINES = [...CORE_MEDICINES, ...GENERATED.medicines, ...REAL_MEDICINES];
+var PRICE_SEED = [...CORE_PRICES, ...GENERATED.prices, ...REAL_PRICES];
 function buildPriceRecords(now = /* @__PURE__ */ new Date()) {
-  return PRICE_SEED.map(({ verified_days_ago, ...p2 }) => ({ ...p2, last_verified_at: verified_days_ago == null ? null : isoDaysAgo(verified_days_ago, now) }));
+  return PRICE_SEED.map(({ verified_days_ago, verified_on, ...p2 }) => ({
+    ...p2,
+    last_verified_at: verified_on ?? (verified_days_ago == null ? null : isoDaysAgo(verified_days_ago, now))
+  }));
 }
 
 // src/domain/normalize.ts
@@ -5687,7 +5716,10 @@ var SALT_ALIASES = {
   "clopidogrel bisulphate": "clopidogrel",
   "levothyroxine sodium": "levothyroxine",
   thyroxine: "levothyroxine",
-  "thyroxine sodium": "levothyroxine"
+  "thyroxine sodium": "levothyroxine",
+  "caffeine anhydrous": "caffeine",
+  "anhydrous caffeine": "caffeine",
+  "paracetamol ip": "paracetamol"
 };
 function normalizeIngredients(input) {
   const parts = Array.isArray(input) ? input : input.split(/\+|,|&|\band\b/i);
@@ -5995,11 +6027,12 @@ async function verifyWithStore(store, ex) {
   const pool = await store.candidates(family || null, salts);
   return verifyExtraction(ex, pool);
 }
+var BRAND_SPELLINGS = { donolex: "dolonex", dolonix: "dolonex", sardon: "saridon", saridone: "saridon", crosin: "crocin", okaset: "okacet" };
 function searchTerms(query) {
   const q = query.trim().toLowerCase().replace(/[%_\\]/g, " ");
   if (q.length < 2) return [];
   const words = q.replace(/\b(tablets?|tabs?|capsules?|i\.?p\.?|b\.?p\.?|u\.?s\.?p\.?|mg|mcg|\d+(\.\d+)?\s*(mg|mcg)?)\b/g, " ").split(/[\s,+/]+/).filter((w) => w.length >= 3);
-  return Array.from(new Set([q, ...words].map(canonicalSalt)));
+  return Array.from(new Set([q, ...words].map((w) => BRAND_SPELLINGS[w] ?? canonicalSalt(w))));
 }
 async function searchWithStore(store, query) {
   const terms = searchTerms(query);

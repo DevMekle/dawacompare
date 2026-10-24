@@ -25,6 +25,8 @@ export interface PriceSeed {
   verification_status: RecordVerification;
   /** Days before "today" the price was last verified; null if never. Keeps demo freshness stable. */
   verified_days_ago: number | null;
+  /** Fixed verification date (YYYY-MM-DD) for real-world prices; overrides verified_days_ago. */
+  verified_on?: string;
 }
 
 /** ISO date `days` before `now` (UTC). */
@@ -133,6 +135,9 @@ const GROUPS: GroupSpec[] = [
   { key: "ibu400", salts: ["Ibuprofen"], strength: "400 mg", form: "Tablet", release: "IR", pack: 15, refUnit: 1.6 },
   // Narrow therapeutic index: brand changes need clinical oversight, so alternatives are deliberately not approved.
   { key: "lt4_50", salts: ["Levothyroxine"], strength: "50 mcg", form: "Tablet", release: "IR", pack: 100, refUnit: 1.65, states: ["ok_sp", "rejected", "rejected", "pending"] },
+  // Sample alternatives for the real brands below.
+  { key: "pcmcaf", salts: ["Paracetamol", "Caffeine"], strength: "500 mg + 50 mg", form: "Tablet", release: "IR", pack: 10, refUnit: 4.8, states: ["ok_sp", "ok", "ok", "pending"] },
+  { key: "prx20", salts: ["Piroxicam"], strength: "20 mg", form: "Tablet", release: "IR", pack: 10, refUnit: 11.5, states: ["ok_sp", "ok", "stale", "ok"] },
 ];
 
 const DEFAULT_STATES: [BrandState, BrandState, BrandState, BrandState] = ["ok_sp", "ok", "ok", "stale"];
@@ -146,6 +151,7 @@ const BRAND_POOL = [
   "Wovira", "Xandelo", "Yelvex", "Zorvana", "Alvessa", "Bronvia", "Cyvora", "Dexalo", "Elvanta", "Fovira", "Gelvex", "Hirvana",
   "Ilvora", "Jarvexo", "Kirvana", "Larvexa", "Melvora", "Norvessa", "Ovanta", "Pirvex", "Quelvia", "Ravona", "Sivexa", "Torvana",
   "Ulvessa", "Vandora", "Wirvex", "Xorvia", "Yavira", "Zelvona", "Aqvira", "Bolvexa", "Crevana", "Dorvia", "Elvexa", "Fyrvana",
+  "Gavexo", "Harvila", "Inzora", "Jupexa", "Kalvora", "Lomexa", "Mirvana", "Nexalo",
 ];
 
 const MAKERS = [
@@ -198,9 +204,36 @@ function generate(): { medicines: MedicineRecord[]; prices: PriceSeed[] } {
 
 const GENERATED = generate();
 
-export const MEDICINES: MedicineRecord[] = [...CORE_MEDICINES, ...GENERATED.medicines];
-export const PRICE_SEED: PriceSeed[] = [...CORE_PRICES, ...GENERATED.prices];
+// ---------------------------------------------------------------------------
+// REAL BRANDS (identification only). Brand, maker and composition as shown on public
+// online pharmacy listings; MRP from those listings, checked on the date given.
+// review_status is "pending": no review has been done, so they are never offered as
+// alternatives. They can be identified as the customer's current medicine.
+// ---------------------------------------------------------------------------
+const PUBLIC_LISTING_DATE = "2026-10-24";
+
+const REAL_MEDICINES: MedicineRecord[] = [
+  { medicine_id: "real_crocin_adv_500", brand_name: "Crocin Advance 500", manufacturer: "GlaxoSmithKline Pharmaceuticals Ltd", active_ingredients: ["Paracetamol"], strength: "500 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+  { medicine_id: "real_okacet_10", brand_name: "Okacet 10", manufacturer: "Cipla Ltd", active_ingredients: ["Cetirizine"], strength: "10 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+  { medicine_id: "real_dolonex_rapid_20", brand_name: "Dolonex Rapid 20", manufacturer: "Pfizer Ltd", active_ingredients: ["Piroxicam"], strength: "20 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+  { medicine_id: "real_new_saridon", brand_name: "New Saridon", manufacturer: "Bayer Pharmaceuticals Pvt Ltd", active_ingredients: ["Paracetamol", "Caffeine"], strength: "500 mg + 50 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+  { medicine_id: "real_saridon", brand_name: "Saridon", manufacturer: null, active_ingredients: ["Paracetamol", "Propyphenazone", "Caffeine"], strength: "250 mg + 150 mg + 50 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+];
+
+const REAL_PRICES: PriceSeed[] = [
+  { price_id: "pr_real_crocin_adv_500", medicine_id: "real_crocin_adv_500", price_type: "MRP", amount: 19.31, pack_quantity: 20, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
+  { price_id: "pr_real_okacet_10", medicine_id: "real_okacet_10", price_type: "MRP", amount: 19.73, pack_quantity: 10, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
+  { price_id: "pr_real_dolonex_rapid_20", medicine_id: "real_dolonex_rapid_20", price_type: "MRP", amount: 136.15, pack_quantity: 10, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
+  { price_id: "pr_real_new_saridon", medicine_id: "real_new_saridon", price_type: "MRP", amount: 55, pack_quantity: 10, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
+  // Classic Saridon: no current listing found, so no price is stored.
+];
+
+export const MEDICINES: MedicineRecord[] = [...CORE_MEDICINES, ...GENERATED.medicines, ...REAL_MEDICINES];
+export const PRICE_SEED: PriceSeed[] = [...CORE_PRICES, ...GENERATED.prices, ...REAL_PRICES];
 
 export function buildPriceRecords(now: Date = new Date()): PriceRecord[] {
-  return PRICE_SEED.map(({ verified_days_ago, ...p }) => ({ ...p, last_verified_at: verified_days_ago == null ? null : isoDaysAgo(verified_days_ago, now) }));
+  return PRICE_SEED.map(({ verified_days_ago, verified_on, ...p }) => ({
+    ...p,
+    last_verified_at: verified_on ?? (verified_days_ago == null ? null : isoDaysAgo(verified_days_ago, now)),
+  }));
 }

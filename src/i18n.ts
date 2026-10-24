@@ -35,6 +35,7 @@ const en = {
     sample_pharmacy_feed: "Sample pharmacy price feed",
     sample_pack_mrp: "MRP printed on sample pack",
     sample_admin_entry: "Sample admin entry",
+    public_listing: "Public online pharmacy listing",
   } as Record<string, string>,
 
   // ---- Screen 1
@@ -73,8 +74,8 @@ const en = {
   } as Record<string, [string, string]>,
   manualToggle: "Type the medicine name instead",
   manualLabel: "Medicine or salt name",
-  manualPlaceholder: "e.g. paracetamol, atorvastatin, cetirizine",
-  manualHint: "The sample catalogue covers about 25 common medicines (paracetamol, atorvastatin, pantoprazole, cetirizine, metformin and more) under fictional brand names. If your brand isn't found, search by the salt name.",
+  manualPlaceholder: "e.g. Crocin, Saridon, cetirizine",
+  manualHint: "Try a brand like Crocin, Okacet, Dolonex or Saridon, or a salt like paracetamol, atorvastatin or pantoprazole. If your brand isn't found, search by the salt name.",
   catalogueFrom: (src: string, n: number) => (src === "postgres" ? `From the DawaCompare database · ${n} products` : `From the built-in sample catalogue · ${n} products`),
   noVisionTitle: "Automatic reading isn't connected yet",
   noVisionBody: "This prototype can't read real photos. Type the salt or brand name printed on your pack, for example “Cetirizine 10 mg”.",
@@ -130,7 +131,7 @@ const en = {
   } as Record<string, [string, string]>,
   unableReasons: {
     unreadable: "The photo couldn't be read. Retake it in good light with the brand, salt and strength visible, or type the name.",
-    no_record: "This product isn't in the catalogue, so there is nothing verified to compare it with. The demo catalogue only holds a few fictional brands.",
+    no_record: "This brand isn't in our catalogue yet, so there is nothing verified to compare it with. Try typing the salt name from the pack.",
     critical_mismatch: "A detail on the pack doesn't match the catalogue record for this brand. Check the highlighted field. If the reading is wrong, correct it and check again.",
   } as Record<string, string>,
   colField: "Detail",
@@ -157,7 +158,7 @@ const en = {
   // ---- Screen 3
   s3Title: "Reviewed alternatives",
   s3Body: "Listed only when salt, strength, dosage form and release type match exactly and the product has an approved review in the catalogue.",
-  sampleNote: "Sample data. Every brand, manufacturer, price and review status here is fictional and not a current market price.",
+  sampleNote: "Alternatives shown are sample brands with sample prices, not current market prices. Well-known brands are included only so your medicine can be recognised; their price comes from a public online listing on the date shown. Confirm prices at your chemist.",
   yours: "Your medicine",
   reviewedAlt: "Reviewed alternative",
   reviewNote: "Approved in the sample catalogue",
@@ -303,6 +304,7 @@ const hi: Strings = {
     sample_pharmacy_feed: "नमूना फ़ार्मेसी मूल्य फ़ीड",
     sample_pack_mrp: "नमूना पैक पर छपा MRP",
     sample_admin_entry: "नमूना एडमिन प्रविष्टि",
+    public_listing: "सार्वजनिक ऑनलाइन फ़ार्मेसी सूची",
   },
 
   s1Eyebrow: "हर महीने ख़रीदी जाने वाली दवाओं के लिए",
@@ -340,8 +342,8 @@ const hi: Strings = {
   },
   manualToggle: "दवा का नाम लिखें",
   manualLabel: "दवा या सॉल्ट का नाम",
-  manualPlaceholder: "जैसे paracetamol, atorvastatin, cetirizine",
-  manualHint: "नमूना कैटलॉग में लगभग 25 आम दवाएँ (पैरासिटामोल, एटोरवास्टेटिन, पैंटोप्राज़ोल, सेटिरिज़िन, मेटफ़ॉर्मिन आदि) काल्पनिक ब्रांड नामों से हैं। ब्रांड न मिले तो सॉल्ट के नाम से खोजें।",
+  manualPlaceholder: "जैसे Crocin, Saridon, cetirizine",
+  manualHint: "Crocin, Okacet, Dolonex या Saridon जैसा ब्रांड, या paracetamol, atorvastatin, pantoprazole जैसा सॉल्ट लिखें। ब्रांड न मिले तो सॉल्ट के नाम से खोजें।",
   catalogueFrom: (src: string, n: number) => (src === "postgres" ? `DawaCompare डेटाबेस से · ${n} उत्पाद` : `बिल्ट-इन नमूना कैटलॉग से · ${n} उत्पाद`),
   noVisionTitle: "स्वचालित पहचान अभी जुड़ी नहीं है",
   noVisionBody: "यह प्रोटोटाइप असली फ़ोटो नहीं पढ़ सकता। पैक पर छपा सॉल्ट या ब्रांड का नाम लिखें, जैसे “Cetirizine 10 mg”।",
@@ -396,7 +398,7 @@ const hi: Strings = {
   },
   unableReasons: {
     unreadable: "फ़ोटो पढ़ी नहीं जा सकी। अच्छी रोशनी में ब्रांड, सॉल्ट और स्ट्रेंथ दिखाते हुए फिर से फ़ोटो लें, या नाम लिखें।",
-    no_record: "यह उत्पाद कैटलॉग में नहीं है, इसलिए सत्यापित तुलना नहीं हो सकती। डेमो कैटलॉग में केवल कुछ काल्पनिक ब्रांड हैं।",
+    no_record: "यह ब्रांड अभी हमारे कैटलॉग में नहीं है, इसलिए सत्यापित तुलना नहीं हो सकती। पैक पर छपा सॉल्ट का नाम लिखकर देखें।",
     critical_mismatch: "पैक की एक जानकारी इस ब्रांड के कैटलॉग रिकॉर्ड से मेल नहीं खाती। हाइलाइट की गई जानकारी देखें। अगर पढ़ाई ग़लत है, तो ठीक करके फिर से जाँचें।",
   },
   colField: "जानकारी",
@@ -422,7 +424,7 @@ const hi: Strings = {
 
   s3Title: "समीक्षित विकल्प",
   s3Body: "केवल वही उत्पाद दिखाए जाते हैं जिनका सॉल्ट, स्ट्रेंथ, रूप और रिलीज़ प्रकार बिल्कुल मेल खाता है और जिनकी कैटलॉग में समीक्षा स्वीकृत है।",
-  sampleNote: "नमूना डेटा। यहाँ हर ब्रांड, निर्माता, दाम और समीक्षा स्थिति काल्पनिक है और मौजूदा बाज़ार दाम नहीं है।",
+  sampleNote: "दिखाए गए विकल्प नमूना ब्रांड और नमूना दाम हैं, मौजूदा बाज़ार दाम नहीं। जाने-माने ब्रांड केवल आपकी दवा पहचानने के लिए शामिल हैं; उनका दाम दिखाई गई तारीख़ की सार्वजनिक ऑनलाइन सूची से है। दाम अपने केमिस्ट से पुष्टि करें।",
   yours: "आपकी दवा",
   reviewedAlt: "समीक्षित विकल्प",
   reviewNote: "नमूना कैटलॉग में स्वीकृत",

@@ -17,6 +17,9 @@ export async function verifyWithStore(store: CatalogueStore, ex: Extraction): Pr
   return verifyExtraction(ex, pool);
 }
 
+/** Common ways people mistype brand names, mapped to the catalogue spelling. */
+const BRAND_SPELLINGS: Record<string, string> = { donolex: "dolonex", dolonix: "dolonex", sardon: "saridon", saridone: "saridon", crosin: "crocin", okaset: "okacet" };
+
 /** Turns what a user types ("Cetrizine Tablets I.P. 10mg") into lower-case brand/salt search terms. */
 export function searchTerms(query: string): string[] {
   const q = query.trim().toLowerCase().replace(/[%_\\]/g, " ");
@@ -25,7 +28,7 @@ export function searchTerms(query: string): string[] {
     .replace(/\b(tablets?|tabs?|capsules?|i\.?p\.?|b\.?p\.?|u\.?s\.?p\.?|mg|mcg|\d+(\.\d+)?\s*(mg|mcg)?)\b/g, " ")
     .split(/[\s,+/]+/)
     .filter((w) => w.length >= 3);
-  return Array.from(new Set([q, ...words].map(canonicalSalt)));
+  return Array.from(new Set([q, ...words].map((w) => BRAND_SPELLINGS[w] ?? canonicalSalt(w))));
 }
 
 export async function searchWithStore(store: CatalogueStore, query: string): Promise<MedicineRecord[]> {

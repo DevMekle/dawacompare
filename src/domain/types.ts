@@ -6,7 +6,7 @@ export type ReleaseType = "IR" | "SR" | "ER" | "MR" | "DR";
 export type ReviewStatus = "approved" | "pending" | "rejected";
 export type RecordVerification = "verified" | "unverified";
 export type PriceType = "MRP" | "SELLING_PRICE";
-export type PriceSourceKey = "sample_manufacturer_list" | "sample_pharmacy_feed" | "sample_pack_mrp" | "sample_admin_entry";
+export type PriceSourceKey = "sample_manufacturer_list" | "sample_pharmacy_feed" | "sample_pack_mrp" | "sample_admin_entry" | "public_listing";
 
 /** One product in the structured medicine catalogue (planned: PostgreSQL `medicines` table). */
 export interface MedicineRecord {

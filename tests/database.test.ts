@@ -46,7 +46,7 @@ const norm = (x: any) => JSON.parse(JSON.stringify(x, (_k, v) => (Array.isArray(
   });
 
   await test("search gives identical results (brands, salts, misspellings, pack text)", async () => {
-    for (const q of ["glucora", "cetrizine", "Cetirizine Tablets I.P. 10mg", "amoxycillin", "pantoprazole sodium", "atorva", "Paracetamol 650", "xyz", "thyroxine"]) {
+    for (const q of ["glucora", "cetrizine", "Cetirizine Tablets I.P. 10mg", "amoxycillin", "pantoprazole sodium", "atorva", "Paracetamol 650", "xyz", "thyroxine", "crocin", "donolex", "Saridon", "okacet 10mg"]) {
       assert.deepEqual((await searchWithStore(sql, q)).map((m) => m.medicine_id), (await searchWithStore(seed, q)).map((m) => m.medicine_id), q);
     }
     assert.ok((await searchWithStore(sql, "amoxycillin")).length > 0);

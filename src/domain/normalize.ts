@@ -32,6 +32,9 @@ const SALT_ALIASES: Record<string, string> = {
   "levothyroxine sodium": "levothyroxine",
   thyroxine: "levothyroxine",
   "thyroxine sodium": "levothyroxine",
+  "caffeine anhydrous": "caffeine",
+  "anhydrous caffeine": "caffeine",
+  "paracetamol ip": "paracetamol",
 };
 
 export function normalizeIngredients(input: string | string[]): string[] {
