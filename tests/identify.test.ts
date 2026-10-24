@@ -81,9 +81,9 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
       return { ok: true, status: 200, json: async () => ({ output_text: JSON.stringify({ is_medicine_pack: false, brand_name: { value: null, read: "not_found" }, active_ingredients: { value: null, read: "not_found" }, strength: { value: null, read: "not_found" }, dosage_form: { value: null, read: "not_found" }, release_type: { value: null, read: "not_found" } }) }) };
     };
     const { res, out } = mockRes();
-    const err = console.error; console.error = () => {};
+    const err = console.error, warn = console.warn; console.error = () => {}; console.warn = () => {};
     await handler({ method: "POST", body: { image: IMG } }, res);
-    console.error = err;
+    console.error = err; console.warn = warn;
     assert.equal(models.length, 2);
     assert.equal(out.code, 200);
     assert.equal(out.body.model, "gpt-4.1-mini");
@@ -117,7 +117,7 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
     };
     const { res, out } = mockRes();
     await handler({ method: "POST", body: { image: IMG } }, res);
-    assert.ok(cap.url!.includes("generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"));
+    assert.ok(cap.url!.includes("generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"));
     assert.equal(cap.init.headers["x-goog-api-key"], "AIzaTestKey1234567890");
     const sent = JSON.parse(cap.init.body);
     assert.equal(sent.contents[0].parts[1].inline_data.mime_type, "image/jpeg");
@@ -128,18 +128,21 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
     assert.equal(toExtraction(out.body.result).brand_name.value, "Cetimac");
   });
 
-  await test("Gemini free quota exhausted on one model: retries the lighter model", async () => {
+  await test("retired model (404) then quota (429): moves down the model list", async () => {
     const urls: string[] = [];
     (globalThis as any).fetch = async (url: string) => {
       urls.push(url);
-      if (urls.length === 1) return { ok: false, status: 429, json: async () => ({ error: { status: "RESOURCE_EXHAUSTED", message: "quota" } }) };
+      if (urls.length === 1) return { ok: false, status: 404, json: async () => ({ error: { status: "NOT_FOUND", message: "no longer available" } }) };
+      if (urls.length === 2) return { ok: false, status: 429, json: async () => ({ error: { status: "RESOURCE_EXHAUSTED", message: "quota" } }) };
       return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"is_medicine_pack":false}' }] } }] }) };
     };
     const { res, out } = mockRes();
-    const err = console.error; console.error = () => {};
+    const err = console.error, warn = console.warn; console.error = () => {}; console.warn = () => {};
     await handler({ method: "POST", body: { image: IMG } }, res);
-    console.error = err;
-    assert.ok(urls[1].includes("gemini-2.5-flash-lite"));
+    console.error = err; console.warn = warn;
+    assert.equal(urls.length, 3);
+    assert.ok(urls[1].includes("gemini-3.5-flash:"));
+    assert.ok(urls[2].includes("gemini-2.5-flash:"));
     assert.equal(out.code, 200);
   });
 

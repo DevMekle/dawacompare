@@ -25,10 +25,8 @@ __export(identify_exports, {
   default: () => handler
 });
 module.exports = __toCommonJS(identify_exports);
-var DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
-var FALLBACK_OPENAI_MODEL = "gpt-4.1-mini";
-var DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-var FALLBACK_GEMINI_MODEL = "gemini-2.5-flash-lite";
+var OPENAI_MODELS = ["gpt-5.4-mini", "gpt-4.1-mini"];
+var GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"];
 var MAX_DATA_URL_CHARS = 4e6;
 var INSTRUCTIONS = `You read medicine packaging photographed by a user in India.
 Extract ONLY what is printed on the pack. Never guess, infer or fill in from general knowledge.
@@ -90,14 +88,16 @@ async function handler(req, res) {
   if (!m) return res.status(400).json({ error: "bad_image" });
   if (image.length > MAX_DATA_URL_CHARS) return res.status(413).json({ error: "too_large" });
   const { provider, key } = chosen;
-  const first = provider === "gemini" ? process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL : process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
-  const fallback = provider === "gemini" ? FALLBACK_GEMINI_MODEL : FALLBACK_OPENAI_MODEL;
+  const preferred = provider === "gemini" ? process.env.GEMINI_MODEL : process.env.OPENAI_MODEL;
+  const models = Array.from(new Set([preferred, ...provider === "gemini" ? GEMINI_MODELS : OPENAI_MODELS].filter(Boolean)));
   const call = (model) => provider === "gemini" ? callGemini(key, model, m[1], m[2]) : callOpenAI(key, model, image);
+  const skippable = (o) => o.status === 404 || o.code === "model_not_found" || o.code === "NOT_FOUND" || provider === "gemini" && o.status === 429;
   try {
-    let model = first;
+    let model = models[0];
     let out = await call(model);
-    if (!out.ok && model !== fallback && (out.status === 404 || out.code === "model_not_found" || provider === "gemini" && out.status === 429)) {
-      model = fallback;
+    for (let i = 1; i < models.length && !out.ok && skippable(out); i++) {
+      console.warn(`Vision model skipped: provider=${provider} model=${model} status=${out.status} code=${out.code}`);
+      model = models[i];
       out = await call(model);
     }
     if (!out.ok) {

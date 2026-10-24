@@ -60,7 +60,7 @@ Insert into `medicines` and `price_records`. Two helper columns must be filled t
 
 ### Free option: Google Gemini
 1. Go to aistudio.google.com, sign in with a Google account, click **Get API key → Create API key**. No card needed for the free tier.
-2. In Vercel → **Settings → Environment Variables**, add `GEMINI_API_KEY` (optional `GEMINI_MODEL`, default `gemini-2.5-flash`, falls back to `gemini-2.5-flash-lite` when the free quota runs out).
+2. In Vercel → **Settings → Environment Variables**, add `GEMINI_API_KEY` (optional `GEMINI_MODEL`). The function tries `gemini-3.5-flash-lite`, then `gemini-3.5-flash`, then `gemini-2.5-flash`, skipping any model that is retired or out of free quota.
 3. Redeploy. Gemini is used whenever its key is set; set `VISION_PROVIDER=openai` to force OpenAI.
 
 Free-tier limits are per minute and per day, and Google states free-tier content may be used to improve its products. A pack photo contains printed packaging text only, but use a billed key if that matters.

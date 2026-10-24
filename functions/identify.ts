@@ -4,18 +4,18 @@
 //
 // Providers (set in Vercel → Project → Settings → Environment Variables):
 //   GEMINI_API_KEY   Google Gemini (has a free tier; key from aistudio.google.com)
-//   GEMINI_MODEL     optional, defaults to DEFAULT_GEMINI_MODEL
+//   GEMINI_MODEL     optional, tried before GEMINI_MODELS
 //   OPENAI_API_KEY   OpenAI (paid credits)
-//   OPENAI_MODEL     optional, defaults to DEFAULT_OPENAI_MODEL
+//   OPENAI_MODEL     optional, tried before OPENAI_MODELS
 //   VISION_PROVIDER  optional: "gemini" or "openai". If unset, Gemini is used when its key exists.
 //
 // GET /api/identify returns { configured, provider } so the app knows whether live reading is available.
 // Failure reasons (no credit, bad key, quota…) are written to the function logs only, never sent to customers.
 
-const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
-const FALLBACK_OPENAI_MODEL = "gpt-4.1-mini";
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-const FALLBACK_GEMINI_MODEL = "gemini-2.5-flash-lite";
+// Models are tried in order until one answers. A model that is retired (404) or out of
+// free quota (429, Gemini) is skipped. GEMINI_MODEL / OPENAI_MODEL, if set, are tried first.
+const OPENAI_MODELS = ["gpt-5.4-mini", "gpt-4.1-mini"];
+const GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"];
 const MAX_DATA_URL_CHARS = 4_000_000; // stays under Vercel's 4.5 MB request limit
 
 type Provider = "gemini" | "openai";
@@ -95,16 +95,17 @@ export default async function handler(req: Req, res: Res) {
   if ((image as string).length > MAX_DATA_URL_CHARS) return res.status(413).json({ error: "too_large" });
 
   const { provider, key } = chosen;
-  const first = provider === "gemini" ? process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL : process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
-  const fallback = provider === "gemini" ? FALLBACK_GEMINI_MODEL : FALLBACK_OPENAI_MODEL;
+  const preferred = provider === "gemini" ? process.env.GEMINI_MODEL : process.env.OPENAI_MODEL;
+  const models = Array.from(new Set([preferred, ...(provider === "gemini" ? GEMINI_MODELS : OPENAI_MODELS)].filter(Boolean) as string[]));
   const call = (model: string) => (provider === "gemini" ? callGemini(key, model, m[1], m[2]) : callOpenAI(key, model, image as string));
+  const skippable = (o: Call) => o.status === 404 || o.code === "model_not_found" || o.code === "NOT_FOUND" || (provider === "gemini" && o.status === 429);
 
   try {
-    let model = first;
+    let model = models[0];
     let out = await call(model);
-    // Retry once on a different model if this one is unavailable or out of free quota.
-    if (!out.ok && model !== fallback && (out.status === 404 || out.code === "model_not_found" || (provider === "gemini" && out.status === 429))) {
-      model = fallback;
+    for (let i = 1; i < models.length && !out.ok && skippable(out); i++) {
+      console.warn(`Vision model skipped: provider=${provider} model=${model} status=${out.status} code=${out.code}`);
+      model = models[i];
       out = await call(model);
     }
     if (!out.ok) {
