@@ -9,17 +9,12 @@ import { photoToDataUrl } from "../lib/image";
 import { createSeedStore, CatalogueInfo } from "../catalogue/store";
 import { comparisonWithStore, searchWithStore, verifyWithStore } from "../catalogue/service";
 
-export type VisionError = "not_medicine" | "too_large" | "decode_failed" | "not_configured" | "vision_failed" | "no_credit" | "bad_key" | "rate_limited" | "model_unavailable";
+export type VisionError = "not_medicine" | "too_large" | "decode_failed" | "busy" | "vision_failed";
 
-/** Maps OpenAI error codes (relayed by /api/identify) to messages the app can explain. */
+/** Only reasons the customer can act on are distinguished; every service-side problem is "vision_failed". */
 function visionErrorFrom(j: any): VisionError {
-  const code = String(j?.code ?? "");
   if (j?.error === "too_large") return "too_large";
-  if (j?.error === "not_configured") return "not_configured";
-  if (code === "insufficient_quota" || code === "billing_hard_limit_reached") return "no_credit";
-  if (code === "invalid_api_key" || j?.status === 401) return "bad_key";
-  if (code === "rate_limit_exceeded" || j?.status === 429) return "rate_limited";
-  if (code === "model_not_found" || j?.status === 404) return "model_unavailable";
+  if (j?.error === "busy") return "busy";
   return "vision_failed";
 }
 
@@ -120,11 +115,7 @@ export const mockApi: DawaApi = {
       throw new Error("vision_failed");
     }
     const j: any = await r.json().catch(() => null);
-    if (!r.ok) {
-      const err: any = new Error(visionErrorFrom(j));
-      err.detail = [j?.status, j?.code, j?.detail].filter(Boolean).join(" · ");
-      throw err;
-    }
+    if (!r.ok) throw new Error(visionErrorFrom(j));
     if (j?.result?.is_medicine_pack === false) throw new Error("not_medicine");
     return toExtraction(j?.result);
   },

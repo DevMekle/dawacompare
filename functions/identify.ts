@@ -86,18 +86,22 @@ export default async function handler(req: Req, res: Res) {
       ({ r, data } = await callOpenAI(key, model, image));
     }
     if (!r.ok) {
+      // The reason (no credit, bad key, rate limit…) is for the team only: it goes to the
+      // Vercel function logs, never to the customer.
       const code = String(data?.error?.code ?? data?.error?.type ?? "");
-      console.error("OpenAI error", r.status, code, data?.error?.message);
-      // Pass back only OpenAI's error code and a key-free message so the app can explain the failure.
-      return res.status(502).json({ error: "vision_failed", status: r.status, code, detail: scrub(String(data?.error?.message ?? "")).slice(0, 200), model });
+      console.error(`OpenAI error: status=${r.status} code=${code} model=${model} message=${scrub(String(data?.error?.message ?? ""))}`);
+      return res.status(502).json({ error: r.status === 429 && code !== "insufficient_quota" ? "busy" : "vision_failed" });
     }
     const text = outputText(data);
     const parsed = text ? safeParse(text) : null;
-    if (!parsed) return res.status(502).json({ error: "vision_unreadable", model });
+    if (!parsed) {
+      console.error(`OpenAI returned no parsable result: model=${model}`);
+      return res.status(502).json({ error: "vision_failed" });
+    }
     return res.status(200).json({ model, result: parsed });
   } catch (e) {
     console.error("identify failed", e);
-    return res.status(502).json({ error: "vision_failed", code: "network" });
+    return res.status(502).json({ error: "vision_failed" });
   }
 }
 

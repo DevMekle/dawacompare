@@ -68,8 +68,7 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
     await handler({ method: "POST", body: { image: IMG } }, res);
     console.error = err;
     assert.equal(out.code, 502);
-    assert.equal(out.body.error, "vision_failed");
-    assert.equal(out.body.code, "invalid_api_key");
+    assert.deepEqual(out.body, { error: "vision_failed" }); // no codes or messages reach the customer
     assert.ok(!JSON.stringify(out.body).includes("sk-test"));
   });
 
@@ -89,13 +88,14 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
     assert.equal(out.body.model, "gpt-4.1-mini");
   });
 
-  await test("no credit is reported as insufficient_quota", async () => {
+  await test("no credit: customer sees a generic failure, the reason is logged for the team", async () => {
     (globalThis as any).fetch = async () => ({ ok: false, status: 429, json: async () => ({ error: { code: "insufficient_quota", message: "You exceeded your current quota" } }) });
     const { res, out } = mockRes();
-    const err = console.error; console.error = () => {};
+    const logs: string[] = []; const err = console.error; console.error = (m: string) => logs.push(m);
     await handler({ method: "POST", body: { image: IMG } }, res);
     console.error = err;
-    assert.equal(out.body.code, "insufficient_quota");
+    assert.deepEqual(out.body, { error: "vision_failed" });
+    assert.ok(logs.some((l) => l.includes("insufficient_quota")));
   });
 
   globalThis.fetch = realFetch;

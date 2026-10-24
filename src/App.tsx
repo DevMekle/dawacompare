@@ -141,8 +141,8 @@ export function App() {
       applyVerification("photo", ex, v);
       setStep(2);
     } catch (e: any) {
-      const base = t.visionErrors[e?.message] ?? t.identifyErr;
-      setIdentifyError(e?.detail ? `${base} (${t.errorDetail}: ${e.detail})` : base);
+      setIdentifyError(t.visionErrors[e?.message] ?? t.identifyErr);
+      if (e?.message === "vision_failed") setManualOpen(true);
     } finally {
       setPhase(null);
     }
