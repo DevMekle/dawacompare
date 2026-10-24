@@ -1,4 +1,4 @@
-import { STRINGS, Lang, I18nProvider } from "./i18n";
+import { STRINGS, Lang, I18nProvider, AI_NAMES } from "./i18n";
 import { api } from "./api/client";
 import { ComparisonResponse, Extraction, MedicineRecord, PriceType, VerificationResult } from "./domain/types";
 import { extractionFromRecord } from "./domain/verification";
@@ -39,7 +39,9 @@ export function App() {
   const [scenario, setScenario] = useState<ScenarioId>("matched");
   const [phase, setPhase] = useState<Phase | null>(null);
   const [identifyError, setIdentifyError] = useState<string | null>(null);
-  const [visionLive, setVisionLive] = useState(false);
+  const [visionProvider, setVisionProvider] = useState<string | null>(null);
+  const visionLive = !!visionProvider;
+  const aiName = visionProvider ? AI_NAMES[visionProvider] ?? visionProvider : null;
   const [catalogue, setCatalogue] = useState<{ source: string; medicines: number } | null>(null);
   const [readBy, setReadBy] = useState<"vision" | "simulated">("simulated");
   const [manualOpen, setManualOpen] = useState(false);
@@ -76,7 +78,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    api.visionAvailable().then(setVisionLive, () => setVisionLive(false));
+    api.visionAvailable().then(setVisionProvider, () => setVisionProvider(null));
     api.catalogueInfo().then(setCatalogue, () => setCatalogue(null));
   }, []);
 
@@ -221,7 +223,7 @@ export function App() {
   if (step === 2 && result && extraction) {
     screen = (
       <VerifyScreen
-        headRef={headRef} source={source} readBy={readBy} photo={photo} result={result}
+        headRef={headRef} source={source} readBy={readBy} aiName={aiName} photo={photo} result={result}
         chosenId={chosenId} setChosenId={(id) => { setChosenId(id); }} ack={ack} setAck={setAck}
         editing={editing} draft={draft ?? extraction} setDraft={setDraft}
         startEdit={() => { setDraft(JSON.parse(JSON.stringify(extraction))); setEditing(true); }}
@@ -251,14 +253,14 @@ export function App() {
   } else if (step === 5 && current && alt && comparison && confirmed) {
     const summary = buildSummary({
       current, alternatives: comparison.alternatives, selectedId, basis: effBasis,
-      unitsPerDay: outcome?.ok ? unitsPerDay : null, outcome, how: confirmed.how, prepared: new Date(),
+      unitsPerDay: outcome?.ok ? unitsPerDay : null, outcome, how: confirmed.how, prepared: new Date(), aiName,
     }, t, lang);
     screen = <SummaryScreen headRef={headRef} summary={summary} downloader={downloader} canPrint={canPrint} onNew={reset} />;
   } else {
     screen = (
       <HomeScreen
         headRef={headRef} pickerRef={pickerRef} photo={photo} fileError={fileError} onFile={onFile} onRemove={onRemove}
-        scenario={scenario} setScenario={setScenario} onSample={onSample} phase={phase} identifyError={identifyError} onIdentify={identify} visionLive={visionLive}
+        scenario={scenario} setScenario={setScenario} onSample={onSample} phase={phase} identifyError={identifyError} onIdentify={identify} aiName={aiName}
         manualOpen={manualOpen} setManualOpen={setManualOpen} onManualPick={onManualPick}
       />
     );

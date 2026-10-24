@@ -1,6 +1,7 @@
 // Tests the /api/identify function with OpenAI's endpoint mocked. Run with: npm test
 import assert from "node:assert/strict";
 import handler from "../functions/identify";
+delete process.env.GEMINI_API_KEY; delete process.env.VISION_PROVIDER;
 import { toExtraction } from "../src/api/client";
 
 type Captured = { url?: string; init?: any };
@@ -21,7 +22,7 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
     delete process.env.OPENAI_API_KEY;
     const { res, out } = mockRes();
     await handler({ method: "GET" }, res);
-    assert.deepEqual(out.body, { configured: false });
+    assert.deepEqual(out.body, { configured: false, provider: null });
   });
 
   await test("POST without a key returns not_configured", async () => {
@@ -96,6 +97,68 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
     console.error = err;
     assert.deepEqual(out.body, { error: "vision_failed" });
     assert.ok(logs.some((l) => l.includes("insufficient_quota")));
+  });
+
+  console.log("Gemini provider");
+  process.env.GEMINI_API_KEY = "AIzaTestKey1234567890";
+
+  await test("GET reports Gemini when its key is set (preferred over OpenAI)", async () => {
+    const { res, out } = mockRes();
+    await handler({ method: "GET" }, res);
+    assert.deepEqual(out.body, { configured: true, provider: "gemini" });
+  });
+
+  await test("sends inline image + response schema to Gemini and parses the JSON", async () => {
+    const cap: Captured = {};
+    const result = { is_medicine_pack: true, brand_name: { value: "Cetimac", read: "clear" }, active_ingredients: { value: "Cetirizine", read: "clear" }, strength: { value: "10 mg", read: "clear" }, dosage_form: { value: "Tablet", read: "clear" }, release_type: { value: null, read: "not_found" } };
+    (globalThis as any).fetch = async (url: string, init: any) => {
+      cap.url = url; cap.init = init;
+      return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] }) };
+    };
+    const { res, out } = mockRes();
+    await handler({ method: "POST", body: { image: IMG } }, res);
+    assert.ok(cap.url!.includes("generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"));
+    assert.equal(cap.init.headers["x-goog-api-key"], "AIzaTestKey1234567890");
+    const sent = JSON.parse(cap.init.body);
+    assert.equal(sent.contents[0].parts[1].inline_data.mime_type, "image/jpeg");
+    assert.equal(sent.contents[0].parts[1].inline_data.data, "/9j/4AAQSkZJRg==");
+    assert.equal(sent.generationConfig.responseMimeType, "application/json");
+    assert.equal(out.code, 200);
+    assert.equal(out.body.provider, "gemini");
+    assert.equal(toExtraction(out.body.result).brand_name.value, "Cetimac");
+  });
+
+  await test("Gemini free quota exhausted on one model: retries the lighter model", async () => {
+    const urls: string[] = [];
+    (globalThis as any).fetch = async (url: string) => {
+      urls.push(url);
+      if (urls.length === 1) return { ok: false, status: 429, json: async () => ({ error: { status: "RESOURCE_EXHAUSTED", message: "quota" } }) };
+      return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"is_medicine_pack":false}' }] } }] }) };
+    };
+    const { res, out } = mockRes();
+    const err = console.error; console.error = () => {};
+    await handler({ method: "POST", body: { image: IMG } }, res);
+    console.error = err;
+    assert.ok(urls[1].includes("gemini-2.5-flash-lite"));
+    assert.equal(out.code, 200);
+  });
+
+  await test("Gemini errors stay out of the response; key scrubbed from logs", async () => {
+    (globalThis as any).fetch = async () => ({ ok: false, status: 400, json: async () => ({ error: { status: "INVALID_ARGUMENT", message: "API key not valid: AIzaTestKey1234567890" } }) });
+    const { res, out } = mockRes();
+    const logs: string[] = []; const err = console.error; console.error = (m: string) => logs.push(m);
+    await handler({ method: "POST", body: { image: IMG } }, res);
+    console.error = err;
+    assert.deepEqual(out.body, { error: "vision_failed" });
+    assert.ok(logs.length && !logs.join(" ").includes("AIzaTestKey"));
+  });
+
+  await test("VISION_PROVIDER=openai overrides Gemini", async () => {
+    process.env.VISION_PROVIDER = "openai";
+    const { res, out } = mockRes();
+    await handler({ method: "GET" }, res);
+    assert.equal(out.body.provider, "openai");
+    delete process.env.VISION_PROVIDER;
   });
 
   globalThis.fetch = realFetch;

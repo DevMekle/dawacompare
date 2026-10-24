@@ -1,4 +1,4 @@
-import { useI18n } from "../i18n";
+import { useI18n, withAi } from "../i18n";
 import { MedicineRecord } from "../domain/types";
 import { ScenarioId } from "../mock/scenarios";
 import { SAMPLE_PACKS } from "../mock/strips";
@@ -24,7 +24,8 @@ interface Props {
   phase: Phase | null;
   identifyError: string | null;
   onIdentify: (live?: boolean) => void;
-  visionLive: boolean;
+  /** Display name of the live vision service, or null when photo reading isn't available. */
+  aiName: string | null;
   manualOpen: boolean;
   setManualOpen: (v: boolean) => void;
   onManualPick: (m: MedicineRecord) => void;
@@ -34,7 +35,7 @@ export function HomeScreen(p: Props) {
   const { t } = useI18n();
   const busy = p.phase != null;
   const upload = !!p.photo && !p.photo.sample;
-  const live = upload && p.visionLive;
+  const live = upload && !!p.aiName;
   const sample = !!p.photo && p.photo.sample;
   const simPicker = (
     <div className="sim">
@@ -68,7 +69,7 @@ export function HomeScreen(p: Props) {
               return (
                 <li key={ph} className={`ph ph-${state}`}>
                   <span className="ph-icon">{state === "done" ? <Icon name="check" size={16} /> : state === "now" ? <Spinner /> : <Icon name={PHASE_ICON[ph]} size={16} />}</span>
-                  {ph === "reading" && live ? t.readingLive : t.phases[ph]}
+                  {ph === "reading" && live ? withAi(t.readingLive, p.aiName) : t.phases[ph]}
                 </li>
               );
             })}
@@ -83,7 +84,7 @@ export function HomeScreen(p: Props) {
       )}
 
       {live && !busy && (
-        <Notice tone="ok" icon="scan"><strong>{t.liveTitle}</strong><br />{t.liveBody}</Notice>
+        <Notice tone="ok" icon="scan"><strong>{t.liveTitle}</strong><br />{withAi(t.liveBody, p.aiName)}</Notice>
       )}
 
       {upload && !live && !busy && (
@@ -145,7 +146,7 @@ export function HomeScreen(p: Props) {
       </details>
 
       <div className="fineprint">
-        <p className="privacy"><Icon name="lock" size={16} />{p.visionLive ? t.privacyLive : t.privacy}</p>
+        <p className="privacy"><Icon name="lock" size={16} />{p.aiName ? withAi(t.privacyLive, p.aiName) : t.privacy}</p>
         <p className="disclaimer">{t.disclaimer}</p>
       </div>
     </section>

@@ -34,8 +34,8 @@ export function toExtraction(r: any): Extraction {
 export interface DawaApi {
   /** Planned: POST /api/identify (multipart photo) → backend calls OpenAI Vision → Extraction. */
   identifyFromPhoto(photo: Blob | null, demoScenario: ScenarioId): Promise<Extraction>;
-  /** True when the deployment has a configured /api/identify (OpenAI Vision). */
-  visionAvailable(): Promise<boolean>;
+  /** The configured vision provider ("gemini" | "openai") on this deployment, or null. */
+  visionAvailable(): Promise<string | null>;
   /** POST /api/identify: real reading by OpenAI Vision. Rejects with Error(VisionError). */
   identifyWithVision(photo: Blob): Promise<Extraction>;
   /** Which catalogue answers: the deployment's database/API, or the copy bundled in the page. */
@@ -94,14 +94,14 @@ export const mockApi: DawaApi = {
 
   async visionAvailable() {
     // Only a real deployment (e.g. Vercel) has the /api route. File previews and the Claude artifact don't.
-    if (typeof location === "undefined" || !/^https?:$/.test(location.protocol) || (window as any).claude) return false;
+    if (typeof location === "undefined" || !/^https?:$/.test(location.protocol) || (window as any).claude) return null;
     try {
       const r = await fetch("/api/identify", { method: "GET", headers: { Accept: "application/json" } });
-      if (!r.ok) return false;
+      if (!r.ok) return null;
       const j = await r.json();
-      return j?.configured === true;
+      return j?.configured === true ? String(j.provider ?? "openai") : null;
     } catch {
-      return false;
+      return null;
     }
   },
 

@@ -103,11 +103,11 @@ const en = {
     verifying: "Running verification checks",
   } as Record<string, string>,
   identifyErr: "Identification didn't finish. Try again.",
-  readingLive: "Reading the pack with OpenAI Vision",
+  readingLive: "Reading the pack with {ai}",
   liveTitle: "Live reading is on",
-  liveBody: "Your photo is sent to OpenAI only to read the printed details. DawaCompare doesn't store it.",
-  fromVision: "Read from your photo by OpenAI Vision. Check every detail against the pack.",
-  privacyLive: "Your photo is sent securely to OpenAI to read the printed text. DawaCompare doesn't save it and there's no account.",
+  liveBody: "Your photo is sent to {ai} only to read the printed details. DawaCompare doesn't store it.",
+  fromVision: "Read from your photo by {ai}. Check every detail against the pack.",
+  privacyLive: "Your photo is sent securely to {ai} to read the printed text. DawaCompare doesn't save it and there's no account.",
   visionErrors: {
     not_medicine: "This doesn't look like a medicine pack. Retake the photo showing the strip or box.",
     too_large: "That photo is too large to send. Crop it or take a closer photo of the pack.",
@@ -115,7 +115,7 @@ const en = {
     busy: "Photo reading is busy right now. Wait a moment and try again, or type the name from the pack.",
     vision_failed: "We couldn't read this photo right now. Please type the medicine name from the pack instead.",
   } as Record<string, string>,
-  rptHowVision: "Photo read by OpenAI Vision, then matched to a catalogue record",
+  rptHowVision: "Photo read by {ai}, then matched to a catalogue record",
   tryAgain: "Try again",
 
   // ---- Screen 2
@@ -370,11 +370,11 @@ const hi: Strings = {
     verifying: "जाँच की जा रही है",
   },
   identifyErr: "पहचान पूरी नहीं हुई। फिर से कोशिश करें।",
-  readingLive: "OpenAI Vision से पैक पढ़ा जा रहा है",
+  readingLive: "{ai} से पैक पढ़ा जा रहा है",
   liveTitle: "लाइव पहचान चालू है",
-  liveBody: "आपकी फ़ोटो केवल छपी जानकारी पढ़ने के लिए OpenAI को भेजी जाती है। DawaCompare उसे सेव नहीं करता।",
-  fromVision: "OpenAI Vision ने आपकी फ़ोटो से पढ़ा। हर जानकारी पैक से मिलाएँ।",
-  privacyLive: "छपा टेक्स्ट पढ़ने के लिए आपकी फ़ोटो सुरक्षित रूप से OpenAI को भेजी जाती है। DawaCompare उसे सेव नहीं करता और कोई खाता नहीं बनता।",
+  liveBody: "आपकी फ़ोटो केवल छपी जानकारी पढ़ने के लिए {ai} को भेजी जाती है। DawaCompare उसे सेव नहीं करता।",
+  fromVision: "{ai} ने आपकी फ़ोटो से पढ़ा। हर जानकारी पैक से मिलाएँ।",
+  privacyLive: "छपा टेक्स्ट पढ़ने के लिए आपकी फ़ोटो सुरक्षित रूप से {ai} को भेजी जाती है। DawaCompare उसे सेव नहीं करता और कोई खाता नहीं बनता।",
   visionErrors: {
     not_medicine: "यह दवा का पैक नहीं लगता। स्ट्रिप या डिब्बा दिखाते हुए फिर से फ़ोटो लें।",
     too_large: "यह फ़ोटो भेजने के लिए बहुत बड़ी है। क्रॉप करें या पैक की नज़दीक से फ़ोटो लें।",
@@ -382,7 +382,7 @@ const hi: Strings = {
     busy: "फ़ोटो पहचान अभी व्यस्त है। थोड़ी देर बाद फिर कोशिश करें या पैक से नाम लिखें।",
     vision_failed: "अभी यह फ़ोटो पढ़ी नहीं जा सकी। कृपया पैक से दवा का नाम लिखें।",
   },
-  rptHowVision: "OpenAI Vision ने फ़ोटो पढ़ी, फिर कैटलॉग रिकॉर्ड से मिलान हुआ",
+  rptHowVision: "{ai} ने फ़ोटो पढ़ी, फिर कैटलॉग रिकॉर्ड से मिलान हुआ",
   tryAgain: "फिर से कोशिश करें",
 
   s2Title: "पहचानी गई दवा की जाँच करें",
@@ -533,6 +533,10 @@ const hi: Strings = {
 };
 
 export const STRINGS: Record<Lang, Strings> = { en, hi };
+
+/** Fills the AI service name into strings that mention it. */
+export const withAi = (s: string, ai: string | null) => s.replace(/\{ai\}/g, ai ?? "AI");
+export const AI_NAMES: Record<string, string> = { gemini: "Google Gemini", openai: "OpenAI" };
 
 const Ctx = React.createContext<{ t: Strings; lang: Lang }>({ t: en, lang: "en" });
 export const I18nProvider = Ctx.Provider;

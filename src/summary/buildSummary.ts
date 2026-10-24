@@ -3,6 +3,7 @@
 // Deliberately holds no personal data: no name, age, condition or prescription details.
 
 import type { Strings, Lang } from "../i18n";
+import { withAi } from "../i18n";
 import type { ComparableProduct, PriceQuote, PriceType } from "../domain/types";
 import type { SavingsOutcome } from "../domain/pricing";
 import { inr, fmtDate, fmtNum } from "../lib/format";
@@ -18,6 +19,7 @@ export interface SummaryInput {
   outcome: SavingsOutcome | null;
   how: ConfirmedHow;
   prepared: Date;
+  aiName?: string | null;
 }
 
 export interface Summary {
@@ -52,7 +54,7 @@ function perUnit(p: ComparableProduct, basis: PriceType): string {
 export function buildSummary(s: SummaryInput, t: Strings, lang: Lang): Summary {
   const c = s.current;
   const formulation = (p: ComparableProduct) => `${p.active_ingredients.join(" + ")} · ${p.strength} · ${t.forms[p.dosage_form]} · ${t.releases[p.release_type]}`;
-  const how = s.how === "matched" ? t.rptHowMatched : s.how === "vision" ? t.rptHowVision : s.how === "chosen" ? t.rptHowChosen : t.rptHowManual;
+  const how = s.how === "matched" ? t.rptHowMatched : s.how === "vision" ? withAi(t.rptHowVision, s.aiName ?? null) : s.how === "chosen" ? t.rptHowChosen : t.rptHowManual;
 
   const confirmed: [string, string][] = [
     [t.fields.brand_name, c.brand_name],

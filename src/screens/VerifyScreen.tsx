@@ -1,4 +1,4 @@
-import { useI18n } from "../i18n";
+import { useI18n, withAi } from "../i18n";
 import { Extraction, VerificationResult } from "../domain/types";
 import { Icon } from "../components/Icon";
 import { ActionBar, Notice, ScreenHead, StatusBanner, Spinner } from "../components/ui";
@@ -9,6 +9,7 @@ interface Props {
   headRef: any;
   source: "photo" | "manual";
   readBy: "vision" | "simulated";
+  aiName: string | null;
   photo: Photo | null;
   result: VerificationResult;
   chosenId: string | null;
@@ -55,7 +56,7 @@ export function VerifyScreen(p: Props) {
 
       <div className="source-row">
         {p.photo && p.source === "photo" && <img src={p.photo.url} alt="" />}
-        <span className="muted small"><Icon name={p.source === "photo" ? "scan" : "keyboard"} size={14} />{p.source === "manual" ? t.fromManual : p.readBy === "vision" ? t.fromVision : t.fromPhoto}</span>
+        <span className="muted small"><Icon name={p.source === "photo" ? "scan" : "keyboard"} size={14} />{p.source === "manual" ? t.fromManual : p.readBy === "vision" ? withAi(t.fromVision, p.aiName) : t.fromPhoto}</span>
       </div>
 
       {p.editing ? (

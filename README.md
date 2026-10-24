@@ -56,7 +56,16 @@ Each group mixes the states the app must handle: verified MRP and selling price,
 
 Insert into `medicines` and `price_records`. Two helper columns must be filled the same way the app normalises text: `brand_family` (lower-case first word of the brand) and `ingredients_norm` (lower-case canonical salt names, sorted, e.g. `{amoxicillin,clavulanic acid}`). The simplest route is to add rows to `src/data/seed.ts` (or a similar generator), run `npm run db:sql`, and load the result.
 
-## Turn on live photo reading (OpenAI Vision)
+## Turn on live photo reading
+
+### Free option: Google Gemini
+1. Go to aistudio.google.com, sign in with a Google account, click **Get API key → Create API key**. No card needed for the free tier.
+2. In Vercel → **Settings → Environment Variables**, add `GEMINI_API_KEY` (optional `GEMINI_MODEL`, default `gemini-2.5-flash`, falls back to `gemini-2.5-flash-lite` when the free quota runs out).
+3. Redeploy. Gemini is used whenever its key is set; set `VISION_PROVIDER=openai` to force OpenAI.
+
+Free-tier limits are per minute and per day, and Google states free-tier content may be used to improve its products. A pack photo contains printed packaging text only, but use a billed key if that matters.
+
+### Paid option: OpenAI Vision
 
 1. Get an API key at platform.openai.com → API keys. Usage is billed per request.
 2. In Vercel: **Project → Settings → Environment Variables**, add `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`, default `gpt-5.4-mini`).
