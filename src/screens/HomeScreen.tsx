@@ -83,10 +83,6 @@ export function HomeScreen(p: Props) {
         <Notice tone="block" icon="alert" role="alert">{p.identifyError}</Notice>
       )}
 
-      {live && !busy && (
-        <Notice tone="ok" icon="scan"><strong>{t.liveTitle}</strong><br />{withAi(t.liveBody, p.aiName)}</Notice>
-      )}
-
       {upload && !live && !busy && (
         <>
           <Notice tone="info" icon="info"><strong>{t.noVisionTitle}</strong><br />{t.noVisionBody}</Notice>

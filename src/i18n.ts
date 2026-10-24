@@ -103,10 +103,10 @@ const en = {
     verifying: "Running verification checks",
   } as Record<string, string>,
   identifyErr: "Identification didn't finish. Try again.",
-  readingLive: "Reading the pack with {ai}",
+  readingLive: "Reading the pack",
   liveTitle: "Live reading is on",
   liveBody: "Your photo is sent to {ai} only to read the printed details. DawaCompare doesn't store it.",
-  fromVision: "Read from your photo by {ai}. Check every detail against the pack.",
+  fromVision: "Read from your photo. Check every detail against the pack.",
   privacyLive: "Your photo is sent securely to {ai} to read the printed text. DawaCompare doesn't save it and there's no account.",
   visionErrors: {
     not_medicine: "This doesn't look like a medicine pack. Retake the photo showing the strip or box.",
@@ -115,7 +115,7 @@ const en = {
     busy: "Photo reading is busy right now. Wait a moment and try again, or type the name from the pack.",
     vision_failed: "We couldn't read this photo right now. Please type the medicine name from the pack instead.",
   } as Record<string, string>,
-  rptHowVision: "Photo read by {ai}, then matched to a catalogue record",
+  rptHowVision: "Photo read automatically, then matched to a catalogue record",
   tryAgain: "Try again",
 
   // ---- Screen 2
@@ -370,10 +370,10 @@ const hi: Strings = {
     verifying: "जाँच की जा रही है",
   },
   identifyErr: "पहचान पूरी नहीं हुई। फिर से कोशिश करें।",
-  readingLive: "{ai} से पैक पढ़ा जा रहा है",
+  readingLive: "पैक पढ़ा जा रहा है",
   liveTitle: "लाइव पहचान चालू है",
   liveBody: "आपकी फ़ोटो केवल छपी जानकारी पढ़ने के लिए {ai} को भेजी जाती है। DawaCompare उसे सेव नहीं करता।",
-  fromVision: "{ai} ने आपकी फ़ोटो से पढ़ा। हर जानकारी पैक से मिलाएँ।",
+  fromVision: "आपकी फ़ोटो से पढ़ा गया। हर जानकारी पैक से मिलाएँ।",
   privacyLive: "छपा टेक्स्ट पढ़ने के लिए आपकी फ़ोटो सुरक्षित रूप से {ai} को भेजी जाती है। DawaCompare उसे सेव नहीं करता और कोई खाता नहीं बनता।",
   visionErrors: {
     not_medicine: "यह दवा का पैक नहीं लगता। स्ट्रिप या डिब्बा दिखाते हुए फिर से फ़ोटो लें।",
@@ -382,7 +382,7 @@ const hi: Strings = {
     busy: "फ़ोटो पहचान अभी व्यस्त है। थोड़ी देर बाद फिर कोशिश करें या पैक से नाम लिखें।",
     vision_failed: "अभी यह फ़ोटो पढ़ी नहीं जा सकी। कृपया पैक से दवा का नाम लिखें।",
   },
-  rptHowVision: "{ai} ने फ़ोटो पढ़ी, फिर कैटलॉग रिकॉर्ड से मिलान हुआ",
+  rptHowVision: "फ़ोटो अपने-आप पढ़ी गई, फिर कैटलॉग रिकॉर्ड से मिलान हुआ",
   tryAgain: "फिर से कोशिश करें",
 
   s2Title: "पहचानी गई दवा की जाँच करें",
