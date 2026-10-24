@@ -37,3 +37,24 @@ CREATE TABLE IF NOT EXISTS price_records (
 );
 
 CREATE INDEX IF NOT EXISTS price_records_medicine_idx ON price_records (medicine_id, price_type, last_verified_at DESC);
+
+-- Anonymous feedback and usage events. No names, phone numbers or health details are collected.
+CREATE TABLE IF NOT EXISTS feedback (
+  id                 bigserial PRIMARY KEY,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  helpful            boolean,
+  comment            text CHECK (comment IS NULL OR length(comment) <= 1000),
+  medicine_name      text,
+  alternative_name   text,
+  monthly_saving     numeric(10, 2),
+  lang               text
+);
+
+CREATE TABLE IF NOT EXISTS events (
+  id          bigserial PRIMARY KEY,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  name        text NOT NULL CHECK (name IN ('comparison_viewed', 'savings_viewed', 'summary_ready', 'shared_whatsapp', 'saved_medicine')),
+  meta        jsonb
+);
+
+CREATE INDEX IF NOT EXISTS events_name_idx ON events (name, created_at);

@@ -135,7 +135,7 @@ const GROUPS: GroupSpec[] = [
   { key: "ibu400", salts: ["Ibuprofen"], strength: "400 mg", form: "Tablet", release: "IR", pack: 15, refUnit: 1.6 },
   // Narrow therapeutic index: brand changes need clinical oversight, so alternatives are deliberately not approved.
   { key: "lt4_50", salts: ["Levothyroxine"], strength: "50 mcg", form: "Tablet", release: "IR", pack: 100, refUnit: 1.65, states: ["ok_sp", "rejected", "rejected", "pending"] },
-  // Sample alternatives for the real brands below.
+  // Sample groups for the demo mode.
   { key: "pcmcaf", salts: ["Paracetamol", "Caffeine"], strength: "500 mg + 50 mg", form: "Tablet", release: "IR", pack: 10, refUnit: 4.8, states: ["ok_sp", "ok", "ok", "pending"] },
   { key: "prx20", salts: ["Piroxicam"], strength: "20 mg", form: "Tablet", release: "IR", pack: 10, refUnit: 11.5, states: ["ok_sp", "ok", "stale", "ok"] },
 ];
@@ -205,28 +205,99 @@ function generate(): { medicines: MedicineRecord[]; prices: PriceSeed[] } {
 const GENERATED = generate();
 
 // ---------------------------------------------------------------------------
-// REAL BRANDS (identification only). Brand, maker and composition as shown on public
-// online pharmacy listings; MRP from those listings, checked on the date given.
-// review_status is "pending": no review has been done, so they are never offered as
-// alternatives. They can be identified as the customer's current medicine.
+// REAL DATA (what the live database serves).
+//
+// Brands: brand, maker, composition and MRP as shown on public online pharmacy
+//   listings (truemeds.in / pharmeasy.in / apollopharmacy.in), checked on LISTING_DATE.
+//   review_status "pending": brands are never offered as alternatives; they are
+//   recognised as the customer's current medicine.
+// Jan Aushadhi: government generic medicines from the PMBJP product list
+//   (drug code, unit size, MRP; list updated 30 Aug 2026), checked on LISTING_DATE.
+//   review_status "approved" means: same salt, strength, dosage form and release type
+//   as the brand, per the published product names. It is not a clinical review.
+//   Levothyroxine is "rejected": brand changes for this narrow-therapeutic-index drug
+//   need a doctor, so no alternative is offered.
+// Metoprolol is not paired: the Jan Aushadhi name does not state the salt (succinate/tartrate).
+// Piroxicam is not paired: dispersible vs plain tablet could not be confirmed for the brand.
 // ---------------------------------------------------------------------------
-const PUBLIC_LISTING_DATE = "2026-10-24";
+const LISTING_DATE = "2026-10-24";
+
+type RealSpec = [id: string, brand: string, maker: string | null, salts: string[], strength: string, form: DosageForm, release: ReleaseType, mrp: number | null, pack: number];
+
+const BRANDS: RealSpec[] = [
+  ["real_crocin_adv_500", "Crocin Advance 500", "GlaxoSmithKline Pharmaceuticals Ltd", ["Paracetamol"], "500 mg", "Tablet", "IR", 19.31, 20],
+  ["real_dolo_650", "Dolo 650", "Micro Labs Ltd", ["Paracetamol"], "650 mg", "Tablet", "IR", 32.12, 15],
+  ["real_okacet_10", "Okacet 10", "Cipla Ltd", ["Cetirizine"], "10 mg", "Tablet", "IR", 19.73, 10],
+  ["real_lcet_5", "L Cet 5", "Nodysis Pharma Pvt Ltd", ["Levocetirizine"], "5 mg", "Tablet", "IR", 37.5, 10],
+  ["real_glycomet_sr_500", "Glycomet SR 500", "USV Pvt Ltd", ["Metformin"], "500 mg", "Tablet", "SR", 42.24, 20],
+  ["real_amaryl_1", "Amaryl 1", "Sanofi India Ltd", ["Glimepiride"], "1 mg", "Tablet", "IR", 118.44, 30],
+  ["real_atorva_10", "Atorva 10", "Zydus Healthcare Ltd", ["Atorvastatin"], "10 mg", "Tablet", "IR", 80.14, 15],
+  ["real_atorva_20", "Atorva 20", "Zydus Healthcare Ltd", ["Atorvastatin"], "20 mg", "Tablet", "IR", 130.93, 10],
+  ["real_rosuvas_10", "Rosuvas 10", "Sun Pharma (Ranbaxy)", ["Rosuvastatin"], "10 mg", "Tablet", "IR", 375, 15],
+  ["real_amlong_5", "Amlong 5", "Micro Labs Ltd", ["Amlodipine"], "5 mg", "Tablet", "IR", 47.59, 15],
+  ["real_telma_40", "Telma 40", "Glenmark Pharmaceuticals Ltd", ["Telmisartan"], "40 mg", "Tablet", "IR", 108.36, 15],
+  ["real_losar_50", "Losar 50", "Torrent Pharmaceuticals Ltd", ["Losartan"], "50 mg", "Tablet", "IR", 178.31, 15],
+  ["real_pan_40", "Pan 40", "Alkem Laboratories Ltd", ["Pantoprazole"], "40 mg", "Tablet", "DR", 192.8, 15],
+  ["real_omez_20", "Omez 20", "Dr. Reddy's Laboratories Ltd", ["Omeprazole"], "20 mg", "Capsule", "DR", 61.22, 20],
+  ["real_azithral_500", "Azithral 500", "Alembic Pharmaceuticals Ltd", ["Azithromycin"], "500 mg", "Tablet", "IR", 126.73, 5],
+  ["real_augmentin_duo_625", "Augmentin Duo 625", "GlaxoSmithKline Pharmaceuticals Ltd", ["Amoxicillin", "Clavulanic Acid"], "500 mg + 125 mg", "Tablet", "IR", 140.88, 6],
+  ["real_ecosprin_75", "Ecosprin 75", "USV Pvt Ltd", ["Aspirin"], "75 mg", "Tablet", "DR", 5.29, 14],
+  ["real_clop_75", "Clop 75", "West-Coast Pharmaceutical Works Ltd", ["Clopidogrel"], "75 mg", "Tablet", "IR", 25.78, 10],
+  ["real_brufen_400", "Brufen 400", "Abbott India Ltd", ["Ibuprofen"], "400 mg", "Tablet", "IR", 25.17, 15],
+  ["real_thyronorm_50", "Thyronorm 50", "Abbott India Ltd", ["Levothyroxine"], "50 mcg", "Tablet", "IR", 132.87, 120],
+  ["real_dolonex_rapid_20", "Dolonex Rapid 20", "Pfizer Ltd", ["Piroxicam"], "20 mg", "Tablet", "IR", 136.15, 10],
+  ["real_new_saridon", "New Saridon", "Bayer Pharmaceuticals Pvt Ltd", ["Paracetamol", "Caffeine"], "500 mg + 50 mg", "Tablet", "IR", 55, 10],
+  ["real_saridon", "Saridon", null, ["Paracetamol", "Propyphenazone", "Caffeine"], "250 mg + 150 mg + 50 mg", "Tablet", "IR", null, 10],
+];
+
+/** [drug code, product name as listed, salts, strength, form, release, unit size, MRP, review] */
+type JaSpec = [code: number, name: string, salts: string[], strength: string, form: DosageForm, release: ReleaseType, pack: number, mrp: number, review?: ReviewStatus];
+
+const JAN_AUSHADHI: JaSpec[] = [
+  [23, "Paracetamol Tablets IP 500 mg", ["Paracetamol"], "500 mg", "Tablet", "IR", 10, 6.56],
+  [511, "Paracetamol Tablets IP 650 mg", ["Paracetamol"], "650 mg", "Tablet", "IR", 15, 15.47],
+  [240, "Cetirizine Hydrochloride Tablets IP 10 mg", ["Cetirizine"], "10 mg", "Tablet", "IR", 10, 5.68],
+  [248, "Levocetirizine Tablets IP 5 mg", ["Levocetirizine"], "5 mg", "Tablet", "IR", 10, 7.94],
+  [145, "Metformin Hydrochloride Tablets IP 500 mg", ["Metformin"], "500 mg", "Tablet", "IR", 10, 6.81],
+  [372, "Metformin Hydrochloride Prolonged-release Tablets IP 500 mg", ["Metformin"], "500 mg", "Tablet", "SR", 10, 10.79],
+  [137, "Glimepiride Tablets IP 1 mg", ["Glimepiride"], "1 mg", "Tablet", "IR", 10, 4.54],
+  [138, "Glimepiride Tablets IP 2 mg", ["Glimepiride"], "2 mg", "Tablet", "IR", 10, 5.68],
+  [266, "Atorvastatin Tablets IP 10 mg", ["Atorvastatin"], "10 mg", "Tablet", "IR", 10, 9.08],
+  [267, "Atorvastatin Tablets IP 20 mg", ["Atorvastatin"], "20 mg", "Tablet", "IR", 10, 12.47],
+  [759, "Rosuvastatin Tablets IP 10 mg", ["Rosuvastatin"], "10 mg", "Tablet", "IR", 15, 19.28],
+  [264, "Amlodipine Tablets IP 5 mg", ["Amlodipine"], "5 mg", "Tablet", "IR", 10, 5.68],
+  [300, "Telmisartan Tablets IP 40 mg", ["Telmisartan"], "40 mg", "Tablet", "IR", 10, 12.38],
+  [289, "Losartan Tablets IP 50 mg", ["Losartan"], "50 mg", "Tablet", "IR", 10, 12.47],
+  [212, "Pantoprazole Gastro-resistant Tablets IP 40 mg", ["Pantoprazole"], "40 mg", "Tablet", "DR", 10, 12.47],
+  [207, "Omeprazole Gastro-resistant Capsules IP 20 mg", ["Omeprazole"], "20 mg", "Capsule", "DR", 10, 10.21],
+  [72, "Azithromycin Tablets IP 500 mg", ["Azithromycin"], "500 mg", "Tablet", "IR", 3, 39.38],
+  [39, "Amoxycillin 500 mg and Potassium Clavulanate 125 mg Tablets IP", ["Amoxicillin", "Clavulanic Acid"], "500 mg + 125 mg", "Tablet", "IR", 6, 57.85],
+  [790, "Aspirin Enteric-coated Tablets IP 75 mg", ["Aspirin"], "75 mg", "Tablet", "DR", 14, 2.81],
+  [269, "Clopidogrel Tablets IP 75 mg", ["Clopidogrel"], "75 mg", "Tablet", "IR", 10, 19.28],
+  [16, "Ibuprofen Tablets IP 400 mg", ["Ibuprofen"], "400 mg", "Tablet", "IR", 15, 9.08],
+  [1221, "Thyroxine Sodium Tablets IP 50 mcg", ["Levothyroxine"], "50 mcg", "Tablet", "IR", 100, 55.65, "rejected"],
+];
 
 const REAL_MEDICINES: MedicineRecord[] = [
-  { medicine_id: "real_crocin_adv_500", brand_name: "Crocin Advance 500", manufacturer: "GlaxoSmithKline Pharmaceuticals Ltd", active_ingredients: ["Paracetamol"], strength: "500 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
-  { medicine_id: "real_okacet_10", brand_name: "Okacet 10", manufacturer: "Cipla Ltd", active_ingredients: ["Cetirizine"], strength: "10 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
-  { medicine_id: "real_dolonex_rapid_20", brand_name: "Dolonex Rapid 20", manufacturer: "Pfizer Ltd", active_ingredients: ["Piroxicam"], strength: "20 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
-  { medicine_id: "real_new_saridon", brand_name: "New Saridon", manufacturer: "Bayer Pharmaceuticals Pvt Ltd", active_ingredients: ["Paracetamol", "Caffeine"], strength: "500 mg + 50 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
-  { medicine_id: "real_saridon", brand_name: "Saridon", manufacturer: null, active_ingredients: ["Paracetamol", "Propyphenazone", "Caffeine"], strength: "250 mg + 150 mg + 50 mg", dosage_form: "Tablet", release_type: "IR", verification_status: "verified", review_status: "pending" },
+  ...BRANDS.map(([id, brand, maker, salts, strength, form, release]): MedicineRecord => ({
+    medicine_id: id, brand_name: brand, manufacturer: maker, active_ingredients: salts, strength, dosage_form: form, release_type: release, verification_status: "verified", review_status: "pending",
+  })),
+  ...JAN_AUSHADHI.map(([code, name, salts, strength, form, release, , , review]): MedicineRecord => ({
+    medicine_id: `ja_${code}`, brand_name: `Jan Aushadhi ${name}`, manufacturer: `PMBI (Jan Aushadhi) · drug code ${code}`, active_ingredients: salts, strength, dosage_form: form, release_type: release, verification_status: "verified", review_status: review ?? "approved",
+  })),
 ];
 
 const REAL_PRICES: PriceSeed[] = [
-  { price_id: "pr_real_crocin_adv_500", medicine_id: "real_crocin_adv_500", price_type: "MRP", amount: 19.31, pack_quantity: 20, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
-  { price_id: "pr_real_okacet_10", medicine_id: "real_okacet_10", price_type: "MRP", amount: 19.73, pack_quantity: 10, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
-  { price_id: "pr_real_dolonex_rapid_20", medicine_id: "real_dolonex_rapid_20", price_type: "MRP", amount: 136.15, pack_quantity: 10, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
-  { price_id: "pr_real_new_saridon", medicine_id: "real_new_saridon", price_type: "MRP", amount: 55, pack_quantity: 10, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: PUBLIC_LISTING_DATE },
-  // Classic Saridon: no current listing found, so no price is stored.
+  ...BRANDS.filter((b) => b[7] != null).map(([id, , , , , , , mrp, pack]): PriceSeed => ({
+    price_id: `pr_${id}`, medicine_id: id, price_type: "MRP", amount: mrp!, pack_quantity: pack, price_source: "public_listing", verification_status: "verified", verified_days_ago: null, verified_on: LISTING_DATE,
+  })),
+  ...JAN_AUSHADHI.map(([code, , , , , , pack, mrp]): PriceSeed => ({
+    price_id: `pr_ja_${code}`, medicine_id: `ja_${code}`, price_type: "MRP", amount: mrp, pack_quantity: pack, price_source: "jan_aushadhi_list", verification_status: "verified", verified_days_ago: null, verified_on: LISTING_DATE,
+  })),
 ];
+
+/** True for rows that are real-world data (served by the live database). */
+export const isRealRecord = (id: string) => id.startsWith("real_") || id.startsWith("ja_");
 
 export const MEDICINES: MedicineRecord[] = [...CORE_MEDICINES, ...GENERATED.medicines, ...REAL_MEDICINES];
 export const PRICE_SEED: PriceSeed[] = [...CORE_PRICES, ...GENERATED.prices, ...REAL_PRICES];

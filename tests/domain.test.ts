@@ -3,13 +3,16 @@ import assert from "node:assert/strict";
 import { verifyExtraction, extractionFromRecord } from "../src/domain/verification";
 import { findEligibleAlternatives } from "../src/domain/eligibility";
 import { withPrices, calculateSavings, comparableBases } from "../src/domain/pricing";
-import { MEDICINES, buildPriceRecords } from "../src/mock/catalogue";
+import { MEDICINES as ALL_MEDICINES, buildPriceRecords } from "../src/mock/catalogue";
+import { isRealRecord } from "../src/data/seed";
+// Most tests exercise the sample/demo catalogue; the real-data tests use ALL_MEDICINES.
+const MEDICINES = ALL_MEDICINES.filter((m) => !isRealRecord(m.medicine_id));
 import { SCENARIOS } from "../src/mock/scenarios";
 import { Extraction } from "../src/domain/types";
 
 const now = new Date("2026-10-23T12:00:00Z");
 const prices = buildPriceRecords(now);
-const byId = (id: string) => MEDICINES.find((m) => m.medicine_id === id)!;
+const byId = (id: string) => ALL_MEDICINES.find((m) => m.medicine_id === id)!;
 const product = (id: string) => withPrices(byId(id), prices, now);
 let passed = 0;
 const test = (name: string, fn: () => void) => { fn(); passed++; console.log("  ✓ " + name); };
@@ -77,25 +80,27 @@ test("no eligible alternative for Telvia 40", () => {
 test("cetirizine group: approved alternatives only, misspelling normalised", () => {
   const r = findEligibleAlternatives(byId("med_allerfree_10"), MEDICINES);
   assert.deepEqual(r.eligible.map((m) => m.medicine_id), ["med_cetzy_10"]);
-  assert.equal(r.excluded.find((e) => e.reason === "not_reviewed")?.count, 2); // Rhinocet (pending) + Okacet (real brand, not reviewed)
+  assert.equal(r.excluded.find((e) => e.reason === "not_reviewed")?.count, 1);
   const ex: Extraction = { brand_name: { value: null, read: "not_found" }, active_ingredients: { value: "Cetrizine", read: "clear" }, strength: { value: "10 mg", read: "clear" }, dosage_form: { value: "Tablet", read: "clear" }, release_type: { value: "IR", read: "clear" } };
-  const v = verifyExtraction(ex, MEDICINES);
-  assert.equal(v.status, "needs_confirmation"); // brand unknown: user must pick the product
+  assert.equal(verifyExtraction(ex, MEDICINES).status, "needs_confirmation"); // brand unknown: user must pick the product
 });
 
-test("real brands are identified but never offered as alternatives", () => {
-  assert.equal(verifyExtraction(extractionFromRecord(byId("real_crocin_adv_500")), MEDICINES).status, "matched");
-  const crocin = findEligibleAlternatives(byId("real_crocin_adv_500"), MEDICINES);
-  assert.ok(crocin.eligible.length >= 3 && crocin.eligible.every((m) => !m.medicine_id.startsWith("real_")));
-  const sample = findEligibleAlternatives(byId("med_pcm500_1"), MEDICINES);
-  assert.ok(!sample.eligible.some((m) => m.medicine_id.startsWith("real_")));
+test("real data: brands are identified, Jan Aushadhi generics are the alternatives", () => {
+  assert.equal(verifyExtraction(extractionFromRecord(byId("real_dolo_650")), ALL_MEDICINES).status, "matched");
+  const dolo = findEligibleAlternatives(byId("real_dolo_650"), ALL_MEDICINES.filter((m) => isRealRecord(m.medicine_id)));
+  assert.deepEqual(dolo.eligible.map((m) => m.medicine_id), ["ja_511"]);
+  // brands are never offered as alternatives
+  const ja = findEligibleAlternatives(byId("ja_511"), ALL_MEDICINES);
+  assert.ok(!ja.eligible.some((m) => m.medicine_id.startsWith("real_")));
   // Saridon (3 salts) and New Saridon (2 salts) are different formulations
-  assert.ok(!findEligibleAlternatives(byId("real_new_saridon"), MEDICINES).eligible.some((m) => m.medicine_id === "real_saridon"));
+  assert.ok(!findEligibleAlternatives(byId("real_new_saridon"), ALL_MEDICINES).eligible.some((m) => m.medicine_id === "real_saridon"));
+  // levothyroxine: Jan Aushadhi row is not approved
+  assert.ok(!findEligibleAlternatives(byId("real_thyronorm_50"), ALL_MEDICINES).eligible.some((m) => m.medicine_id === "ja_1221"));
 });
-test("real brand price uses its listing date", () => {
-  const p = product("real_okacet_10");
-  assert.equal(p.mrp?.last_verified_at, "2026-10-24");
-  assert.equal(p.mrp?.price_source, "public_listing");
+test("real prices carry their source and date", () => {
+  assert.equal(product("real_okacet_10").mrp?.last_verified_at, "2026-10-24");
+  assert.equal(product("real_okacet_10").mrp?.price_source, "public_listing");
+  assert.equal(product("ja_240").mrp?.price_source, "jan_aushadhi_list");
 });
 
 console.log("Prices and savings");

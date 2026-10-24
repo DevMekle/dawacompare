@@ -2,7 +2,7 @@
 // Each one loads only the rows it needs from a CatalogueStore, then applies the
 // same pure rules (verification, eligibility, price freshness) everywhere.
 
-import { ComparisonResponse, Extraction, MedicineRecord, VerificationResult } from "../domain/types";
+import { ComparisonResponse, Extraction, Formulation, MedicineRecord, VerificationResult } from "../domain/types";
 import { verifyExtraction } from "../domain/verification";
 import { findEligibleAlternatives } from "../domain/eligibility";
 import { withPrices } from "../domain/pricing";
@@ -47,4 +47,13 @@ export async function comparisonWithStore(store: CatalogueStore, medicineId: str
     alternatives: eligible.map((r) => withPrices(r, prices, now)),
     excluded,
   };
+}
+
+/** Alternatives for a formulation the customer confirmed from their pack (brand not listed). */
+export async function formulationComparisonWithStore(store: CatalogueStore, f: Formulation, now: Date = new Date()): Promise<Omit<ComparisonResponse, "current">> {
+  const pseudo: MedicineRecord = { medicine_id: "user_pack", brand_name: "", manufacturer: null, ...f, verification_status: "verified", review_status: "pending" };
+  const related = await store.sharingIngredients(normalizeIngredients(f.active_ingredients));
+  const { eligible, excluded } = findEligibleAlternatives(pseudo, related);
+  const prices = await store.prices(eligible.map((m) => m.medicine_id));
+  return { alternatives: eligible.map((r) => withPrices(r, prices, now)), excluded };
 }

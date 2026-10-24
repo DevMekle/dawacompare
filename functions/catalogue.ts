@@ -2,11 +2,12 @@
 //   GET  ?action=status                 → { source: "postgres" | "seed", medicines, prices }
 //   GET  ?action=search&q=cetirizine    → MedicineRecord[]
 //   GET  ?action=comparison&id=med_...  → ComparisonResponse (approved, eligible alternatives + stored prices)
+//   GET  ?action=formulation&ingredients=A|B&strength=..&form=Tablet&release=IR → alternatives for a pack-confirmed formulation
 //   POST { action: "verify", extraction } → VerificationResult
 // Reads from PostgreSQL when DATABASE_URL is set; otherwise serves the bundled sample catalogue.
 
 import { getStore } from "../server/getStore";
-import { comparisonWithStore, searchWithStore, verifyWithStore } from "../src/catalogue/service";
+import { comparisonWithStore, formulationComparisonWithStore, searchWithStore, verifyWithStore } from "../src/catalogue/service";
 import { CRITICAL_FIELDS, Extraction } from "../src/domain/types";
 
 type Req = { method?: string; url?: string; body?: any };
@@ -41,6 +42,16 @@ export default async function handler(req: Req, res: Res) {
           if (e?.message === "not_found") return res.status(404).json({ error: "not_found" });
           throw e;
         }
+      }
+      if (action === "formulation") {
+        const ingredients = (url.searchParams.get("ingredients") ?? "").split("|").map((x) => x.trim()).filter(Boolean).slice(0, 5);
+        const strength = (url.searchParams.get("strength") ?? "").slice(0, 60);
+        const form = url.searchParams.get("form");
+        const release = url.searchParams.get("release");
+        if (!ingredients.length || !strength || !["Tablet", "Capsule"].includes(form ?? "") || !["IR", "SR", "ER", "MR", "DR"].includes(release ?? "")) {
+          return res.status(400).json({ error: "bad_formulation" });
+        }
+        return res.status(200).json(await formulationComparisonWithStore(store, { active_ingredients: ingredients, strength, dosage_form: form as any, release_type: release as any }));
       }
       return res.status(400).json({ error: "unknown_action" });
     }

@@ -16,7 +16,7 @@ function QuoteRow({ label, q }: { label: string; q: PriceQuote | null }) {
       </div>
     );
   }
-  const chip = q.freshness === "current" ? <Chip tone="ok" icon="check">{t.fresh.current}</Chip> : q.freshness === "stale" ? <Chip tone="warn" icon="clock">{t.fresh.stale}</Chip> : <Chip tone="warn" icon="alert">{t.fresh.unverified}</Chip>;
+  const chip = q.price_source === "user_pack" ? <Chip tone="user" icon="pencil">{t.enteredByYou}</Chip> : q.freshness === "current" ? <Chip tone="ok" icon="check">{t.fresh.current}</Chip> : q.freshness === "stale" ? <Chip tone="warn" icon="clock">{t.fresh.stale}</Chip> : <Chip tone="warn" icon="alert">{t.fresh.unverified}</Chip>;
   return (
     <div className={`pq pq-${q.freshness}`}>
       <span className="pq-label">{label}</span>

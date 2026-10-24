@@ -6,6 +6,8 @@ import { Icon } from "../components/Icon";
 import { ActionBar, Notice, Spinner } from "../components/ui";
 import { UploadPanel, Photo } from "../components/UploadPanel";
 import { ManualSearch } from "../components/ManualSearch";
+import { SavedMed } from "../lib/savedMeds";
+import { inr } from "../lib/format";
 
 export type Phase = "reading" | "catalogue" | "verifying";
 const PHASES: Phase[] = ["reading", "catalogue", "verifying"];
@@ -29,6 +31,13 @@ interface Props {
   manualOpen: boolean;
   setManualOpen: (v: boolean) => void;
   onManualPick: (m: MedicineRecord) => void;
+  /** Demo mode shows sample packs and simulated readings. */
+  demo: boolean;
+  saved: SavedMed[];
+  onRecheck: (m: SavedMed) => void;
+  onRemoveSaved: (key: string) => void;
+  /** Total comparisons made on the live site, or null. */
+  checks: number | null;
 }
 
 export function HomeScreen(p: Props) {
@@ -56,6 +65,7 @@ export function HomeScreen(p: Props) {
         <ul className="hero-points">
           <li><Icon name="check" size={16} />{t.noSignup}</li>
           <li><Icon name="check" size={16} />{t.sameFormulation}</li>
+          {p.checks != null && p.checks > 0 && <li><Icon name="listChecks" size={16} />{t.checksSoFar(p.checks)}</li>}
         </ul>
       </div>
 
@@ -86,15 +96,17 @@ export function HomeScreen(p: Props) {
       {upload && !live && !busy && (
         <>
           <Notice tone="info" icon="info"><strong>{t.noVisionTitle}</strong><br />{t.noVisionBody}</Notice>
-          <details className="sim-details">
-            <summary><Icon name="scan" size={16} /><span>{t.demoSimToggle}</span><Icon name="chevronDown" size={16} className="chev" /></summary>
-            {simPicker}
-            <button type="button" className="btn btn-secondary" onClick={() => p.onIdentify(false)}><Icon name="scan" size={18} />{t.simulateCta}</button>
-          </details>
+          {p.demo && (
+            <details className="sim-details">
+              <summary><Icon name="scan" size={16} /><span>{t.demoSimToggle}</span><Icon name="chevronDown" size={16} className="chev" /></summary>
+              {simPicker}
+              <button type="button" className="btn btn-secondary" onClick={() => p.onIdentify(false)}><Icon name="scan" size={18} />{t.simulateCta}</button>
+            </details>
+          )}
         </>
       )}
 
-      {sample && !busy && simPicker}
+      {sample && !busy && p.demo && simPicker}
 
       {!busy && (
         <ActionBar>
@@ -120,15 +132,39 @@ export function HomeScreen(p: Props) {
           </button>
           {p.manualOpen && <div id="manual-panel"><ManualSearch onPick={p.onManualPick} autoFocus /></div>}
 
-          <p className="alt-label">{t.samplesTitle}</p>
-          <div className="samples">
-            {(["matched", "ambiguous_release", "strength_mismatch"] as ScenarioId[]).map((k) => (
-              <button key={k} type="button" className="sample" onClick={() => p.onSample(k)}>
-                <img src={SAMPLE_PACKS[k]!.img} alt="" />
-                <span><strong>{t.samples[k][0]}</strong><small>{t.samples[k][1]}</small></span>
-              </button>
+          {p.demo && (
+            <>
+              <p className="alt-label">{t.samplesTitle}</p>
+              <div className="samples">
+                {(["matched", "ambiguous_release", "strength_mismatch"] as ScenarioId[]).map((k) => (
+                  <button key={k} type="button" className="sample" onClick={() => p.onSample(k)}>
+                    <img src={SAMPLE_PACKS[k]!.img} alt="" />
+                    <span><strong>{t.samples[k][0]}</strong><small>{t.samples[k][1]}</small></span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {!busy && p.saved.length > 0 && (
+        <div className="saved">
+          <div className="saved-head"><strong>{t.myMedsTitle}</strong><span className="muted small">{t.myMedsHint}</span></div>
+          <ul>
+            {p.saved.map((m) => (
+              <li key={m.key} className="saved-item">
+                <div className="saved-main">
+                  <strong>{m.brand}</strong>
+                  <span className="muted small">{m.altName ? `→ ${m.altName}` : ""}{m.monthlySaving ? ` · ${t.savedSaving(inr(m.monthlySaving))}` : ""}</span>
+                </div>
+                <div className="saved-actions">
+                  <button type="button" className="btn btn-quiet" onClick={() => p.onRecheck(m)}><Icon name="rotate" size={16} />{t.recheck}</button>
+                  <button type="button" className="btn btn-quiet icon-only" aria-label={`${t.removeMed}: ${m.brand}`} onClick={() => p.onRemoveSaved(m.key)}><Icon name="x" size={16} /></button>
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
 
@@ -142,7 +178,7 @@ export function HomeScreen(p: Props) {
       </details>
 
       <div className="fineprint">
-        <p className="privacy"><Icon name="lock" size={16} />{p.aiName ? withAi(t.privacyLive, p.aiName) : t.privacy}</p>
+        <p className="privacy"><Icon name="lock" size={16} />{p.aiName ? withAi(t.privacyLive, p.aiName) : p.demo ? t.privacy : t.privacyLocal}</p>
         <p className="disclaimer">{t.disclaimer}</p>
       </div>
     </section>

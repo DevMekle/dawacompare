@@ -3,6 +3,7 @@ import { ComparisonResponse } from "../domain/types";
 import { Icon } from "../components/Icon";
 import { ActionBar, Notice, ScreenHead, Spinner } from "../components/ui";
 import { MedicineCard } from "../components/MedicineCard";
+import { DEMO } from "../lib/mode";
 
 interface Props {
   headRef: any;
@@ -47,7 +48,7 @@ export function CompareScreen(p: Props) {
   return (
     <section className="screen">
       <ScreenHead headRef={p.headRef} title={t.s3Title} body={t.s3Body} />
-      <Notice tone="info" icon="info">{t.sampleNote}</Notice>
+      <Notice tone="info" icon="info">{DEMO ? t.sampleNote : t.realNote}</Notice>
       {p.catalogue && <p className="cat-src muted small"><Icon name="database" size={14} />{t.catalogueFrom(p.catalogue.source, p.catalogue.medicines)}</p>}
 
       <MedicineCard product={current} variant="current" />

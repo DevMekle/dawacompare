@@ -5,7 +5,7 @@
 // Business rules live in src/catalogue/service.ts and src/domain/, never in a store.
 
 import { MedicineRecord, PriceRecord } from "../domain/types";
-import { MEDICINES, buildPriceRecords } from "../data/seed";
+import { MEDICINES, buildPriceRecords, isRealRecord } from "../data/seed";
 import { brandFamily, normalizeIngredients } from "../domain/normalize";
 
 export interface CatalogueInfo {
@@ -27,8 +27,11 @@ export interface CatalogueStore {
   describe(): Promise<CatalogueInfo>;
 }
 
-export function createSeedStore(now: () => Date = () => new Date()): CatalogueStore {
-  const rows = MEDICINES.map((m) => ({ m, family: brandFamily(m.brand_name), salts: normalizeIngredients(m.active_ingredients) }));
+/** dataset "real": only real-world rows (what the live database holds). "all": also the sample/demo rows. */
+export function createSeedStore(now: () => Date = () => new Date(), dataset: "real" | "all" = "all"): CatalogueStore {
+  const meds = dataset === "real" ? MEDICINES.filter((m) => isRealRecord(m.medicine_id)) : MEDICINES;
+  const allPrices = () => buildPriceRecords(now()).filter((p) => dataset === "all" || isRealRecord(p.medicine_id));
+  const rows = meds.map((m) => ({ m, family: brandFamily(m.brand_name), salts: normalizeIngredients(m.active_ingredients) }));
   const overlaps = (a: string[], b: string[]) => a.some((x) => b.includes(x));
   const byBrand = (a: MedicineRecord, b: MedicineRecord) => (a.brand_name < b.brand_name ? -1 : a.brand_name > b.brand_name ? 1 : 0);
   return {
@@ -44,16 +47,16 @@ export function createSeedStore(now: () => Date = () => new Date()): CatalogueSt
         .slice(0, limit);
     },
     async byId(id) {
-      return MEDICINES.find((m) => m.medicine_id === id) ?? null;
+      return meds.find((m) => m.medicine_id === id) ?? null;
     },
     async sharingIngredients(salts) {
       return rows.filter((r) => overlaps(r.salts, salts)).map((r) => r.m);
     },
     async prices(ids) {
-      return buildPriceRecords(now()).filter((p) => ids.includes(p.medicine_id));
+      return allPrices().filter((p) => ids.includes(p.medicine_id));
     },
     async describe() {
-      return { source: "seed", medicines: MEDICINES.length, prices: buildPriceRecords(now()).length };
+      return { source: "seed", medicines: meds.length, prices: allPrices().length };
     },
   };
 }

@@ -2,7 +2,7 @@
 
 A mobile-first React + TypeScript prototype for Indian households that buy the same prescription medicines every month. A user photographs a medicine strip, confirms what it is, sees reviewed alternatives with the same formulation, and gets a savings estimate to discuss with their doctor or pharmacist.
 
-The catalogue lives in a **PostgreSQL database** (101 products across 25 common medicines, 136 price records). Salts, strengths and release types are real; **brand names, manufacturers, prices and review statuses are fictional sample data**. Photo reading uses the **real OpenAI Vision API** when the app is deployed on Vercel with an `OPENAI_API_KEY`; everywhere else it falls back to manual name entry or a clearly labelled simulated reading.
+The live catalogue is **real data** in PostgreSQL: 23 common Indian brands (MRP from public online pharmacy listings) and 22 **Jan Aushadhi** generics (drug code, unit size and MRP from the government PMBJP product list), every price dated. Fictional sample data is used only in **demo mode** (`?demo`, the Claude artifact or a local file) to show every safety state. Photo reading uses the **real OpenAI Vision API** when the app is deployed on Vercel with an `OPENAI_API_KEY`; everywhere else it falls back to manual name entry or a clearly labelled simulated reading.
 
 ## Run it
 
@@ -11,7 +11,7 @@ You need Node.js 18 or newer.
 ```
 npm install
 npm run build      # writes dist/index.html
-npm test           # 17 domain + 5 vision-function + 7 database tests (real Postgres via PGlite)
+npm test           # 19 domain + 12 vision-function + 8 database tests (real Postgres via PGlite)
 npm run db:sql     # regenerate db/seed.sql from src/data/seed.ts
 npm run db:setup   # create tables + load the sample data into DATABASE_URL
 npm run typecheck
@@ -36,21 +36,46 @@ Open `dist/index.html` in a browser. It loads React and the fonts from public CD
 | Summary download, print and copy | **Works.** The summary downloads as a printable HTML file; Print shows when the page is opened directly or on Vercel. |
 | English / Hindi | **Works** for all interface text and safety messages. Catalogue values stay as recorded. |
 
+## Live vs demo mode
+
+| | Live site | Demo mode (`/?demo`, artifact, local file) |
+|---|---|---|
+| Catalogue | Real brands + Jan Aushadhi, from the database | Bundled sample + real data |
+| Photo reading | Gemini / OpenAI when a key is set | Simulated readings and sample packs |
+| "Sample data" labels | Hidden | Shown |
+
+## Product features
+
+- **Compare by salt**: if a brand isn't in the catalogue but its salt, strength and form are, the customer confirms the release type and enters the MRP and pack size printed on their pack. The price is labelled "Printed on your pack (entered by you)".
+- **Jan Aushadhi generics** as alternatives, badged and dated; brands are never offered as alternatives.
+- **Share on WhatsApp** from the summary (family or doctor).
+- **My medicines**: saved on the device (localStorage) to re-check at the next refill.
+- **Feedback** ("Was this helpful?") and anonymous usage events stored in the `feedback` and `events` tables; the home page shows the live count of comparisons.
+
+Useful queries in the Neon SQL editor:
+
+```sql
+SELECT name, count(*) FROM events GROUP BY name;
+SELECT created_at, helpful, comment, medicine_name, alternative_name, monthly_saving FROM feedback ORDER BY created_at DESC;
+```
+
 ## Set up the database (Neon Postgres through Vercel, free tier)
 
 1. In Vercel: **Project → Storage → Create Database → Neon (Postgres)**, pick the free plan and connect it to the project. Vercel adds `DATABASE_URL` to the project's environment variables.
 2. Load the tables and sample data, either way:
    - **Neon SQL editor (no tools needed):** open the database in Neon's console → SQL Editor, paste all of `db/schema.sql`, run it, then paste all of `db/seed.sql` and run it.
    - **From your computer:** `npx vercel link`, `npx vercel env pull .env.local`, then `npm run db:setup`.
-3. Redeploy. On the Compare screen the line under the sample-data note changes to "From the DawaCompare database · 101 products".
+3. Check `https://YOUR-APP.vercel.app/api/catalogue?action=status` shows `"source":"postgres"`.
 
 Any Postgres 14+ works (Supabase, RDS, local): set `DATABASE_URL` to its connection string. The app talks to it only through `functions/catalogue.ts`.
 
-### What's in the sample catalogue
+### What's in the live catalogue
 
-25 formulation groups, 4 fictional brands each (plus the demo groups): paracetamol 500/650 mg, atorvastatin 10/20 mg, rosuvastatin 10 mg, pantoprazole 40 mg (DR), omeprazole 20 mg capsule (DR), metformin 500 mg SR / 500 mg / 1000 mg SR, metformin + glimepiride, glimepiride 1/2 mg, losartan 50 mg, metoprolol succinate 50 mg (ER), amlodipine 5/10 mg, telmisartan 40 mg, telmisartan + amlodipine, telmisartan + HCTZ, cetirizine 10 mg, levocetirizine 5 mg, montelukast + levocetirizine, azithromycin 500 mg, amoxicillin + clavulanic acid 625, aspirin 75 mg (DR), clopidogrel 75 mg, ibuprofen 400 mg, levothyroxine 50 mcg.
+Real brands (MRP, public listing, checked 24 Oct 2026): Crocin Advance 500, Dolo 650, Okacet 10, L Cet 5, Glycomet SR 500, Amaryl 1, Atorva 10, Atorva 20, Rosuvas 10, Amlong 5, Telma 40, Losar 50, Pan 40, Omez 20, Azithral 500, Augmentin Duo 625, Ecosprin 75, Clop 75, Brufen 400, Thyronorm 50, Dolonex Rapid 20, New Saridon, Saridon.
 
-Each group mixes the states the app must handle: verified MRP and selling price, MRP only, stale (over 90 days), unverified, and review pending. Levothyroxine alternatives are deliberately not approved because brand changes for narrow-therapeutic-index drugs need clinical oversight.
+Jan Aushadhi generics (PMBJP product list, updated 30 Aug 2026): paracetamol 500/650, cetirizine 10, levocetirizine 5, metformin 500 and 500 PR, glimepiride 1/2, atorvastatin 10/20, rosuvastatin 10, amlodipine 5, telmisartan 40, losartan 50, pantoprazole 40, omeprazole 20, azithromycin 500, amoxycillin + clavulanate 625, aspirin 75 EC, clopidogrel 75, ibuprofen 400, thyroxine 50 mcg.
+
+Not paired on purpose: levothyroxine (narrow therapeutic index, needs a doctor), metoprolol (Jan Aushadhi name doesn't state the salt), piroxicam (dispersible vs plain not confirmed), Saridon / New Saridon (no matching generic).
 
 ### Adding real data later
 

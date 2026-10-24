@@ -6,7 +6,7 @@ export type ReleaseType = "IR" | "SR" | "ER" | "MR" | "DR";
 export type ReviewStatus = "approved" | "pending" | "rejected";
 export type RecordVerification = "verified" | "unverified";
 export type PriceType = "MRP" | "SELLING_PRICE";
-export type PriceSourceKey = "sample_manufacturer_list" | "sample_pharmacy_feed" | "sample_pack_mrp" | "sample_admin_entry" | "public_listing";
+export type PriceSourceKey = "sample_manufacturer_list" | "sample_pharmacy_feed" | "sample_pack_mrp" | "sample_admin_entry" | "public_listing" | "jan_aushadhi_list" | "user_pack";
 
 /** One product in the structured medicine catalogue (planned: PostgreSQL `medicines` table). */
 export interface MedicineRecord {
@@ -91,11 +91,21 @@ export interface VerificationResult {
   candidates: MedicineRecord[];
   /** Field-by-field checks against the matched record, the only candidate, or the closest record. */
   checks: FieldCheck[];
+  /** When the brand isn't listed: verified records with the same salt(s), strength and form (any release type). */
+  formulation_matches?: MedicineRecord[];
 }
 
 // ---- comparison -------------------------------------------------------------
 
 export type ExclusionReason = "not_reviewed" | "different_release" | "different_strength" | "different_ingredients" | "different_form" | "unverified_record";
+
+/** A formulation the customer confirmed from their pack (used when the brand isn't listed). */
+export interface Formulation {
+  active_ingredients: string[];
+  strength: string;
+  dosage_form: DosageForm;
+  release_type: ReleaseType;
+}
 
 export interface ComparisonResponse {
   current: ComparableProduct;

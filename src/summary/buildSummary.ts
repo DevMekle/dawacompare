@@ -8,7 +8,7 @@ import type { ComparableProduct, PriceQuote, PriceType } from "../domain/types";
 import type { SavingsOutcome } from "../domain/pricing";
 import { inr, fmtDate, fmtNum } from "../lib/format";
 
-export type ConfirmedHow = "matched" | "vision" | "chosen" | "manual";
+export type ConfirmedHow = "matched" | "vision" | "chosen" | "manual" | "pack";
 
 export interface SummaryInput {
   current: ComparableProduct;
@@ -20,6 +20,8 @@ export interface SummaryInput {
   how: ConfirmedHow;
   prepared: Date;
   aiName?: string | null;
+  /** Demo mode uses the sample-data notes; live mode the real-data notes. */
+  demo?: boolean;
 }
 
 export interface Summary {
@@ -54,7 +56,7 @@ function perUnit(p: ComparableProduct, basis: PriceType): string {
 export function buildSummary(s: SummaryInput, t: Strings, lang: Lang): Summary {
   const c = s.current;
   const formulation = (p: ComparableProduct) => `${p.active_ingredients.join(" + ")} · ${p.strength} · ${t.forms[p.dosage_form]} · ${t.releases[p.release_type]}`;
-  const how = s.how === "matched" ? t.rptHowMatched : s.how === "vision" ? withAi(t.rptHowVision, s.aiName ?? null) : s.how === "chosen" ? t.rptHowChosen : t.rptHowManual;
+  const how = s.how === "matched" ? t.rptHowMatched : s.how === "vision" ? withAi(t.rptHowVision, s.aiName ?? null) : s.how === "chosen" ? t.rptHowChosen : s.how === "pack" ? t.rptHowPack : t.rptHowManual;
 
   const confirmed: [string, string][] = [
     [t.fields.brand_name, c.brand_name],
@@ -78,7 +80,7 @@ export function buildSummary(s: SummaryInput, t: Strings, lang: Lang): Summary {
       a.actual_selling_price ? priceText(a.actual_selling_price, t, lang) : "—",
       perUnit(a, s.basis),
       provenance(a, t, lang),
-      t.reviewNote,
+      a.medicine_id.startsWith("ja_") ? `${t.jaBadge}: ${t.jaNote}` : t.reviewNote,
     ],
   }));
 
@@ -111,13 +113,13 @@ export function buildSummary(s: SummaryInput, t: Strings, lang: Lang): Summary {
     confirmed: { heading: t.rptConfirmed, rows: confirmed },
     alternatives: {
       heading: t.rptAlts,
-      columns: [t.fields.brand_name, `${t.fields.active_ingredients} · ${t.fields.strength}`, t.priceTypes.MRP, t.priceTypes.SELLING_PRICE, `${t.perTab} (${t.priceTypes[s.basis]})`, `${t.source} · ${t.lastVerified}`, t.reviewedAlt],
+      columns: [t.fields.brand_name, `${t.fields.active_ingredients} · ${t.fields.strength}`, t.priceTypes.MRP, t.priceTypes.SELLING_PRICE, `${t.perTab} (${t.priceTypes[s.basis]})`, `${t.source} · ${t.lastVerified}`, s.demo ? t.reviewedAlt : t.colResult],
       rows: altRows,
       empty: altRows.length ? null : t.emptyTitle,
     },
     estimate: { heading: t.rptEstimate, rows: est, highlight, note },
     assumptions: { heading: t.assumptionsTitle, items: [t.formulaMonthly, t.formulaAnnual, ...t.assumptions(t.priceTypes[s.basis])] },
-    notes: [t.caution, t.rptReminder, t.rptReview, t.sampleNote, t.rptPrivacy],
+    notes: [t.caution, t.rptReminder, s.demo ? t.rptReview : t.rptReviewReal, s.demo ? t.sampleNote : t.realNote, t.rptPrivacy],
   };
 }
 

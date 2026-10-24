@@ -1,6 +1,10 @@
 // Writes db/seed.sql from src/data/seed.ts. Run: npm run db:sql
 import { writeFileSync } from "node:fs";
-import { MEDICINES, PRICE_SEED } from "../src/data/seed";
+import { MEDICINES as ALL_MEDICINES, PRICE_SEED as ALL_PRICES, isRealRecord } from "../src/data/seed";
+
+// The live database holds real-world rows only. Sample rows stay in the app for the demo mode.
+const MEDICINES = ALL_MEDICINES.filter((m) => isRealRecord(m.medicine_id));
+const PRICE_SEED = ALL_PRICES.filter((p) => isRealRecord(p.medicine_id));
 import { brandFamily, normalizeIngredients } from "../src/domain/normalize";
 
 const q = (s: string | null) => (s == null ? "NULL" : `'${s.replace(/'/g, "''")}'`);
@@ -13,12 +17,12 @@ const prices = PRICE_SEED.map((p) =>
   `  (${[q(p.price_id), q(p.medicine_id), q(p.price_type), p.amount.toFixed(2), String(p.pack_quantity), q(p.price_source), q(p.verification_status), p.verified_on ? `DATE ${q(p.verified_on)}` : p.verified_days_ago == null ? "NULL" : `CURRENT_DATE - ${p.verified_days_ago}`].join(", ")})`,
 );
 
-const sql = `-- DawaCompare SAMPLE catalogue. Generated from src/data/seed.ts by \`npm run db:sql\`; do not edit by hand.
--- Salts, strengths, forms and release types are real common medicines.
--- Brand names, manufacturers, prices, sources and review statuses are FICTIONAL, except the rows with
--- medicine_id starting "real_": real brands for identification, MRP from public online listings (dated).
--- Dates are relative to the day you run this, so sample prices keep the same freshness.
--- Re-running replaces all sample rows.
+const sql = `-- DawaCompare catalogue. Generated from src/data/seed.ts by \`npm run db:sql\`; do not edit by hand.
+-- Real-world data only:
+--   real_*  brands with MRP from public online pharmacy listings (dated)
+--   ja_*    Jan Aushadhi generics from the PMBJP product list (drug code, unit size, MRP; dated)
+-- "approved" on a Jan Aushadhi row means same salt, strength, form and release type as listed; not a clinical review.
+-- Re-running replaces all catalogue rows.
 
 BEGIN;
 

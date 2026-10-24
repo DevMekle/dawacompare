@@ -30,7 +30,7 @@ export function VerificationChecks({ checks }: { checks: FieldCheck[] }) {
         <span role="columnheader">{t.colResult}</span>
       </div>
       {checks.map((c) => (
-        <div key={c.field} className={`check-row is-${c.result}`} role="row">
+        <div key={c.field} className={`check-row is-${c.result === "no_record" && c.field !== "brand_name" ? "neutral" : c.result}`} role="row">
           <span className="check-field" role="rowheader">{t.fields[c.field]}</span>
           <span className="check-read" role="cell">
             <span className="check-k">{t.colRead}</span>

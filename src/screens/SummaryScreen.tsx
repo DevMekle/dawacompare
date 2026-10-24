@@ -3,6 +3,7 @@ import { Summary, summaryToHtml, summaryToText } from "../summary/buildSummary";
 import { Icon } from "../components/Icon";
 import { ActionBar, Notice, ScreenHead } from "../components/ui";
 import { SummaryDocument } from "../components/SummaryDocument";
+import { api } from "../api/client";
 
 const { useState, useRef } = React;
 
@@ -15,6 +16,44 @@ interface Props {
   downloader: Downloader;
   canPrint: boolean;
   onNew: () => void;
+  shareText: string;
+  onShared: () => void;
+  isSaved: boolean;
+  onSave: () => void;
+  feedbackContext: Record<string, unknown>;
+  canSendFeedback: boolean;
+}
+
+/** Anonymous "Was this helpful?" box. Stored only when the live backend accepts it. */
+function FeedbackBox({ context }: { context: Record<string, unknown> }) {
+  const { t } = useI18n();
+  const [helpful, setHelpful] = useState<boolean | null>(null);
+  const [comment, setComment] = useState("");
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const send = async () => {
+    setState("sending");
+    const ok = await api.sendFeedback({ kind: "feedback", helpful, comment: comment.trim() || null, ...context });
+    setState(ok ? "sent" : "failed");
+  };
+  if (state === "sent") return <Notice tone="ok" icon="circleCheck" role="status">{t.fbThanks}</Notice>;
+  return (
+    <div className="feedback">
+      <strong id="fb-title">{t.fbTitle}</strong>
+      <div className="feedback-row" role="group" aria-labelledby="fb-title">
+        <button type="button" className={`btn btn-quiet ${helpful === true ? "on" : ""}`} aria-pressed={helpful === true} onClick={() => setHelpful(true)}><Icon name="check" size={16} />{t.fbYes}</button>
+        <button type="button" className={`btn btn-quiet ${helpful === false ? "on" : ""}`} aria-pressed={helpful === false} onClick={() => setHelpful(false)}><Icon name="x" size={16} />{t.fbNo}</button>
+      </div>
+      {helpful !== null && (
+        <>
+          <textarea id="fb-comment" aria-label={t.fbPlaceholder} placeholder={t.fbPlaceholder} maxLength={1000} value={comment} onChange={(e: any) => setComment(e.target.value)} />
+          <div className="feedback-row">
+            <button type="button" className="btn btn-secondary" onClick={send} disabled={state === "sending"}>{t.fbSend}</button>
+            {state === "failed" && <span className="muted small" role="status">{t.fbFail}</span>}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function SummaryScreen(p: Props) {
@@ -73,10 +112,13 @@ export function SummaryScreen(p: Props) {
         )}
       </ActionBar>
       <div className="secondary-row">
+        <a className="btn btn-quiet btn-wa" href={`https://wa.me/?text=${encodeURIComponent(p.shareText)}`} target="_blank" rel="noopener noreferrer" onClick={p.onShared}><Icon name="arrowRight" size={16} />{t.shareWhatsApp}</a>
+        <button type="button" className="btn btn-quiet" onClick={p.onSave} disabled={p.isSaved} aria-pressed={p.isSaved}><Icon name={p.isSaved ? "check" : "plus"} size={16} />{p.isSaved ? t.savedMed : t.saveMed}</button>
         {p.canPrint && <button type="button" className="btn btn-quiet" onClick={() => window.print()}><Icon name="printer" size={16} />{t.print}</button>}
         {canDownload && <button type="button" className="btn btn-quiet" onClick={copy}><Icon name="copy" size={16} />{t.copy}</button>}
         <button type="button" className="btn btn-quiet" onClick={p.onNew}><Icon name="rotate" size={16} />{t.newComparison}</button>
       </div>
+      {p.canSendFeedback && <FeedbackBox context={p.feedbackContext} />}
     </section>
   );
 }

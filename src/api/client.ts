@@ -3,11 +3,12 @@
 // fetch() calls to the endpoints noted on each method and export it as `api`.
 // The UI does not need to change.
 
-import { ComparisonResponse, Extraction, MedicineRecord, VerificationResult } from "../domain/types";
+import { ComparisonResponse, Extraction, Formulation, MedicineRecord, VerificationResult } from "../domain/types";
+import { DEMO } from "../lib/mode";
 import { SCENARIOS, ScenarioId } from "../mock/scenarios";
 import { photoToDataUrl } from "../lib/image";
 import { createSeedStore, CatalogueInfo } from "../catalogue/store";
-import { comparisonWithStore, searchWithStore, verifyWithStore } from "../catalogue/service";
+import { comparisonWithStore, formulationComparisonWithStore, searchWithStore, verifyWithStore } from "../catalogue/service";
 
 export type VisionError = "not_medicine" | "too_large" | "decode_failed" | "busy" | "vision_failed";
 
@@ -46,6 +47,12 @@ export interface DawaApi {
   searchCatalogue(query: string): Promise<MedicineRecord[]>;
   /** GET /api/catalogue?action=comparison&id= : approved, eligible alternatives with stored prices. */
   getComparison(medicineId: string): Promise<ComparisonResponse>;
+  /** GET /api/catalogue?action=formulation : alternatives for a formulation confirmed from the customer's pack. */
+  getFormulationComparison(f: Formulation): Promise<Omit<ComparisonResponse, "current">>;
+  /** POST /api/feedback : a feedback answer or a usage event. Resolves false if not stored. */
+  sendFeedback(payload: Record<string, unknown>): Promise<boolean>;
+  /** GET /api/feedback?action=stats : public usage counts, or null when unavailable. */
+  usageStats(): Promise<{ checks: number } | null>;
 }
 
 export const SIMULATED = {
@@ -59,7 +66,8 @@ const reduceMotion = () => typeof window !== "undefined" && !!window.matchMedia?
 const latency = (ms: number) => wait(reduceMotion() ? Math.min(ms, 250) : ms);
 
 const bundled = createSeedStore();
-const onDeployment = () => typeof location !== "undefined" && /^https?:$/.test(location.protocol) && !(window as any).claude;
+// The live site uses its API (real catalogue). Demo mode (artifact, local file, ?demo) uses the bundled data.
+const onDeployment = () => !DEMO && typeof location !== "undefined" && /^https?:$/.test(location.protocol);
 
 /** Probes /api/catalogue once. On a deployment it answers from PostgreSQL (or its own seed copy). */
 let backend: Promise<(CatalogueInfo & { via: "api" }) | null> | null = null;
@@ -94,7 +102,7 @@ export const mockApi: DawaApi = {
 
   async visionAvailable() {
     // Only a real deployment (e.g. Vercel) has the /api route. File previews and the Claude artifact don't.
-    if (typeof location === "undefined" || !/^https?:$/.test(location.protocol) || (window as any).claude) return null;
+    if (!onDeployment()) return null;
     try {
       const r = await fetch("/api/identify", { method: "GET", headers: { Accept: "application/json" } });
       if (!r.ok) return null;
@@ -142,6 +150,37 @@ export const mockApi: DawaApi = {
     if (await catalogueBackend()) return getJson(`/api/catalogue?action=comparison&id=${encodeURIComponent(medicineId)}`);
     await latency(700);
     return comparisonWithStore(bundled, medicineId);
+  },
+
+  async getFormulationComparison(f) {
+    if (await catalogueBackend()) {
+      const q = new URLSearchParams({ action: "formulation", ingredients: f.active_ingredients.join("|"), strength: f.strength, form: f.dosage_form, release: f.release_type });
+      return getJson(`/api/catalogue?${q}`);
+    }
+    await latency(500);
+    return formulationComparisonWithStore(bundled, f);
+  },
+
+  async sendFeedback(payload) {
+    if (!onDeployment()) return false;
+    try {
+      const r = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), keepalive: true });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  async usageStats() {
+    if (!onDeployment()) return null;
+    try {
+      const r = await fetch("/api/feedback?action=stats", { headers: { Accept: "application/json" } });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return typeof j?.checks === "number" ? { checks: j.checks } : null;
+    } catch {
+      return null;
+    }
   },
 };
 

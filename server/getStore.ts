@@ -12,7 +12,7 @@ export function getStore(): CatalogueStore {
     const sql = neon(url);
     cached = createSqlStore({ query: (text, params) => sql(text, (params ?? []) as any[]) as Promise<any[]> });
   } else {
-    cached = createSeedStore();
+    cached = createSeedStore(undefined, "real");
   }
   return cached;
 }

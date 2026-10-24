@@ -1,6 +1,7 @@
 // Small shared building blocks.
 import { Icon, IconName } from "./Icon";
 import { useI18n } from "../i18n";
+import { DEMO } from "../lib/mode";
 
 export type Tone = "info" | "ok" | "warn" | "block";
 
@@ -30,8 +31,10 @@ export function Chip({ tone = "mute", icon, children }: { tone?: "ok" | "warn" |
   return <span className={`chip chip-${tone}`}>{icon && <Icon name={icon} size={12} />}{children}</span>;
 }
 
+/** "SAMPLE DATA" tag, shown only in demo mode. */
 export function DemoTag() {
   const { t } = useI18n();
+  if (!DEMO) return null;
   return <span className="demo-tag">{t.demoData}</span>;
 }
 

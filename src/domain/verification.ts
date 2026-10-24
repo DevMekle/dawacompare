@@ -70,7 +70,11 @@ export function verifyExtraction(ex: Extraction, catalogue: MedicineRecord[]): V
     pool = catalogue.filter((r) => normalizeIngredients(r.active_ingredients).join("|") === salts.join("|"));
   }
   if (pool.length === 0) {
-    return { status: "unable", reason: "no_record", record: null, candidates: [], checks: CRITICAL_FIELDS.map((field) => ({ field, extracted: has(field) ? ex[field].value : null, catalogue: null, read: ex[field].read, result: has(field) ? "no_record" : "missing" })) };
+    return {
+      status: "unable", reason: "no_record", record: null, candidates: [],
+      checks: CRITICAL_FIELDS.map((field) => ({ field, extracted: has(field) ? ex[field].value : null, catalogue: null, read: ex[field].read, result: has(field) ? "no_record" : "missing" })),
+      formulation_matches: formulationMatches(ex, catalogue),
+    };
   }
 
   // 2. Check every critical field against each record.
@@ -92,6 +96,23 @@ export function verifyExtraction(ex: Extraction, catalogue: MedicineRecord[]): V
     candidates: viable.map((v) => v.r),
     checks: viable.length === 1 ? viable[0].checks : combinedChecks(ex, viable.map((v) => v.r)),
   };
+}
+
+/**
+ * Records with the same salt(s), strength and dosage form as what was read, for comparing by salt
+ * when the brand itself isn't listed. Release type is left open (the customer confirms it), unless
+ * a release type was read, in which case only that release type is kept.
+ */
+export function formulationMatches(ex: Extraction, catalogue: MedicineRecord[]): MedicineRecord[] {
+  const v = (f: FieldKey) => (ex[f].value && ex[f].read !== "not_found" ? ex[f].value! : null);
+  const salts = v("active_ingredients"), strength = v("strength"), form = v("dosage_form"), release = v("release_type");
+  if (!salts || !strength) return [];
+  return catalogue.filter((r) =>
+    r.verification_status === "verified" &&
+    sameIngredients(salts, r.active_ingredients) &&
+    normalizeStrength(strength) === normalizeStrength(r.strength) &&
+    (!form || normalizeForm(form) === r.dosage_form) &&
+    (!release || normalizeRelease(release) === r.release_type));
 }
 
 /** Builds an extraction from a catalogue record the user picked by name (manual entry). */

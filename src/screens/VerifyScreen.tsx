@@ -1,5 +1,7 @@
 import { useI18n, withAi } from "../i18n";
-import { Extraction, VerificationResult } from "../domain/types";
+import { Extraction, Formulation, ReleaseType, VerificationResult } from "../domain/types";
+
+const { useState } = React;
 import { Icon } from "../components/Icon";
 import { ActionBar, Notice, ScreenHead, StatusBanner, Spinner } from "../components/ui";
 import { VerificationChecks, CandidatePicker, FieldEditor } from "../components/VerificationPanel";
@@ -26,6 +28,8 @@ interface Props {
   onConfirm: () => void;
   onRetake: () => void;
   onManual: () => void;
+  /** Brand not listed but the formulation is: compare using the price on the customer's pack. */
+  onCompareByPack: (f: Formulation, mrp: number, pack: number) => void;
 }
 
 const TONE = { matched: "ok", needs_confirmation: "warn", unable: "block" } as const;
@@ -44,6 +48,21 @@ export function VerifyScreen(p: Props) {
   const toCheck = r.checks.filter((c) => c.result === "unclear" || c.result === "missing").map((c) => t.fields[c.field].toLowerCase());
   const ok = canConfirm(r, p.chosenId, p.ack);
 
+  // Compare by salt (brand not in catalogue, formulation is)
+  const matches = r.status === "unable" && r.reason === "no_record" ? r.formulation_matches ?? [] : [];
+  const releaseOptions = Array.from(new Set(matches.map((m) => m.release_type))) as ReleaseType[];
+  const [packRelease, setPackRelease] = useState<ReleaseType | null>(releaseOptions.length === 1 ? releaseOptions[0] : null);
+  const [packMrp, setPackMrp] = useState("");
+  const [packQty, setPackQty] = useState("");
+  const [packAck, setPackAck] = useState(false);
+  const mrpN = parseFloat(packMrp), qtyN = parseInt(packQty, 10);
+  const packOk = matches.length > 0 && !!packRelease && mrpN > 0 && mrpN <= 100000 && qtyN >= 1 && qtyN <= 1000 && packAck;
+  const comparePack = () => {
+    if (!packOk) return;
+    const m = matches.find((x) => x.release_type === packRelease)!;
+    p.onCompareByPack({ active_ingredients: m.active_ingredients, strength: m.strength, dosage_form: m.dosage_form, release_type: packRelease! }, Math.round(mrpN * 100) / 100, qtyN);
+  };
+
   return (
     <section className="screen">
       <ScreenHead headRef={p.headRef} title={t.s2Title} body={t.s2Body} />
@@ -51,7 +70,36 @@ export function VerifyScreen(p: Props) {
       {p.rechecking ? (
         <div className="banner banner-info" role="status"><span className="banner-icon"><Spinner /></span><div className="banner-text"><strong>{t.phases.verifying}</strong></div></div>
       ) : (
-        <StatusBanner tone={TONE[r.status]} icon={ICON[r.status]} title={title} body={r.status === "unable" && r.reason ? t.unableReasons[r.reason] : body} />
+        matches.length > 0
+          ? <StatusBanner tone="warn" icon="help" title={t.packBannerTitle} body={t.packBannerBody} />
+          : <StatusBanner tone={TONE[r.status]} icon={ICON[r.status]} title={title} body={r.status === "unable" && r.reason ? t.unableReasons[r.reason] : body} />
+      )}
+
+      {!p.editing && matches.length > 0 && (
+        <div className="card pack-card">
+          <h2>{t.packTitle}</h2>
+          <p>{t.packBody}</p>
+          <p className="facts"><span className="fact">{matches[0].active_ingredients.join(" + ")} · {matches[0].strength}</span><span className="fact">{t.forms[matches[0].dosage_form]}</span></p>
+          <div>
+            <span className="field-label" id="pack-rel-label">{t.packRelease}</span>
+            <div className="pick-list" role="radiogroup" aria-labelledby="pack-rel-label">
+              {releaseOptions.map((rt) => (
+                <label key={rt} className={`pick-item ${packRelease === rt ? "on" : ""}`}>
+                  <input type="radio" name="pack-release" id={`pack-rel-${rt}`} checked={packRelease === rt} onChange={() => setPackRelease(rt)} />
+                  <span className="pick-body"><strong>{t.releases[rt]}</strong></span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="pack-grid">
+            <div><label htmlFor="pack-mrp">{t.packMrp}</label><input id="pack-mrp" className="input" type="number" inputMode="decimal" min={0.01} step={0.01} value={packMrp} onChange={(e: any) => setPackMrp(e.target.value)} /></div>
+            <div><label htmlFor="pack-qty">{t.packQty}</label><input id="pack-qty" className="input" type="number" inputMode="numeric" min={1} step={1} value={packQty} onChange={(e: any) => setPackQty(e.target.value)} /></div>
+          </div>
+          <label className="check">
+            <input type="checkbox" id="pack-ack" checked={packAck} onChange={(e: any) => setPackAck(e.target.checked)} />
+            <span>{t.packAck}</span>
+          </label>
+        </div>
       )}
 
       <div className="source-row">
@@ -85,13 +133,16 @@ export function VerifyScreen(p: Props) {
 
       <ActionBar
         hint={
-          !p.editing && r.status === "unable" ? <p className="bar-hint">{t.blockedHint}</p>
+          !p.editing && matches.length > 0 && !packOk ? <p className="bar-hint">{t.packNeed}</p>
+          : !p.editing && r.status === "unable" && matches.length === 0 ? <p className="bar-hint">{t.blockedHint}</p>
           : !p.editing && r.status === "needs_confirmation" && !ok ? <p className="bar-hint">{t.pickHint}</p>
           : null
         }
       >
         {p.editing ? (
           <button type="button" className="btn btn-primary" onClick={p.onRecheck} disabled={p.rechecking}><Icon name="shieldCheck" size={20} />{t.checkAgain}</button>
+        ) : matches.length > 0 ? (
+          <button type="button" className={`btn btn-primary ${packOk ? "" : "is-blocked"}`} aria-disabled={!packOk} onClick={comparePack}><Icon name="arrowRight" size={20} />{t.packCta}</button>
         ) : r.status === "unable" ? (
           p.source === "photo"
             ? <button type="button" className="btn btn-primary" onClick={p.onRetake}><Icon name="camera" size={20} />{t.retakeCta}</button>
@@ -109,6 +160,7 @@ export function VerifyScreen(p: Props) {
         ) : (
           <>
             <button type="button" className="btn btn-quiet" onClick={p.startEdit}><Icon name="pencil" size={16} />{t.correct}</button>
+            {matches.length > 0 && p.source === "photo" && <button type="button" className="btn btn-quiet" onClick={p.onRetake}><Icon name="camera" size={16} />{t.retakeCta}</button>}
             {r.status === "unable" && p.source === "photo" && <button type="button" className="btn btn-quiet" onClick={p.onManual}><Icon name="keyboard" size={16} />{t.manualCta}</button>}
           </>
         )}

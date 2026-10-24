@@ -1,6 +1,9 @@
 import { STRINGS, Lang, I18nProvider, AI_NAMES } from "./i18n";
 import { api } from "./api/client";
-import { ComparisonResponse, Extraction, MedicineRecord, PriceType, VerificationResult } from "./domain/types";
+import { ComparableProduct, ComparisonResponse, Extraction, Formulation, MedicineRecord, PriceQuote, PriceType, VerificationResult } from "./domain/types";
+import { DEMO } from "./lib/mode";
+import { inr } from "./lib/format";
+import { SavedMed, loadSaved, storeSaved } from "./lib/savedMeds";
 import { extractionFromRecord } from "./domain/verification";
 import { calculateSavings, comparableBases } from "./domain/pricing";
 import { buildSummary, ConfirmedHow } from "./summary/buildSummary";
@@ -55,6 +58,7 @@ export function App() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Extraction | null>(null);
   const [rechecking, setRechecking] = useState(false);
+  const [verifyKey, setVerifyKey] = useState(0);
 
   // Screens 3–5
   const [confirmed, setConfirmed] = useState<{ record: MedicineRecord; how: ConfirmedHow } | null>(null);
@@ -65,6 +69,9 @@ export function App() {
   const [unitsPerDay, setUnitsPerDay] = useState<number | null>(null);
   const [basis, setBasis] = useState<PriceType>("MRP");
   const [summaryReady, setSummaryReady] = useState(false);
+  const [packInfo, setPackInfo] = useState<{ f: Formulation; mrp: number; pack: number; brand: string } | null>(null);
+  const [saved, setSaved] = useState<SavedMed[]>(loadSaved);
+  const [checks, setChecks] = useState<number | null>(null);
 
   const [downloader, setDownloader] = useState<Downloader>(() => (window.claude?.use ? { kind: "pending" } : { kind: "native" }));
   const canPrint = !window.claude;
@@ -80,7 +87,11 @@ export function App() {
   useEffect(() => {
     api.visionAvailable().then(setVisionProvider, () => setVisionProvider(null));
     api.catalogueInfo().then(setCatalogue, () => setCatalogue(null));
+    api.usageStats().then((s) => setChecks(s?.checks ?? null), () => setChecks(null));
   }, []);
+
+  /** Anonymous usage event (no personal data); ignored when there's no backend. */
+  const track = (name: string, meta?: Record<string, unknown>) => { api.sendFeedback({ kind: "event", name, meta }); };
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -103,6 +114,7 @@ export function App() {
     setChosenId(v.status === "needs_confirmation" && v.candidates.length === 1 ? v.candidates[0].medicine_id : null);
     setAck(false);
     setEditing(false);
+    setVerifyKey((k) => k + 1);
     clearFromComparison();
   };
 
@@ -177,12 +189,47 @@ export function App() {
   const loadComparison = async (id: string) => {
     setCompState("loading");
     try {
-      setComparison(await api.getComparison(id));
+      const c = await api.getComparison(id);
+      setComparison(c);
       setCompState("ready");
+      track("comparison_viewed", { medicine: c.current.brand_name, alternatives: c.alternatives.length });
     } catch {
       setCompState("error");
     }
   };
+
+  /** Brand not listed: compare the formulation the customer confirmed, priced from their own pack. */
+  const compareByPack = async (f: Formulation, mrp: number, pack: number, brandName?: string) => {
+    const brand = brandName || extraction?.brand_name.value || t.packDefaultName;
+    const today = new Date().toISOString().slice(0, 10);
+    const record: MedicineRecord = { medicine_id: "user_pack", brand_name: brand, manufacturer: null, ...f, verification_status: "verified", review_status: "pending" };
+    const quote: PriceQuote = { price_type: "MRP", amount: mrp, pack_quantity: pack, price_source: "user_pack", verification_status: "verified", last_verified_at: today, freshness: "current", per_unit: mrp / pack };
+    const currentP: ComparableProduct = { ...record, mrp: quote, actual_selling_price: null, pack_quantity: pack, price_source: "user_pack", last_verified_at: today };
+    clearFromComparison();
+    setConfirmed({ record, how: "pack" });
+    setPackInfo({ f, mrp, pack, brand });
+    setCompState("loading");
+    setStep(3);
+    try {
+      const r = await api.getFormulationComparison(f);
+      setComparison({ current: currentP, ...r });
+      setCompState("ready");
+      track("comparison_viewed", { medicine: "pack:" + f.active_ingredients.join("+") + " " + f.strength, alternatives: r.alternatives.length });
+    } catch {
+      setCompState("error");
+    }
+  };
+
+  const recheckSaved = (m: SavedMed) => {
+    if (m.kind === "pack" && m.formulation && m.mrp && m.pack) return compareByPack(m.formulation, m.mrp, m.pack, m.brand);
+    if (m.record) {
+      clearFromComparison();
+      setConfirmed({ record: m.record, how: "manual" });
+      loadComparison(m.record.medicine_id);
+      setStep(3);
+    }
+  };
+  const removeSaved = (key: string) => { const next = saved.filter((x) => x.key !== key); setSaved(next); storeSaved(next); };
   const confirm = () => {
     if (!result || !canConfirm(result, chosenId, ack)) return; // hard guard: unable can never pass
     const record = result.status === "matched" ? result.record! : result.candidates.find((c) => c.medicine_id === chosenId)!;
@@ -207,7 +254,7 @@ export function App() {
     onRemove();
     setFileError(null); setScenario("matched"); setManualOpen(false);
     setExtraction(null); setResult(null); setChosenId(null); setAck(false); setEditing(false);
-    clearFromComparison(); setSort("price"); setStep(1);
+    clearFromComparison(); setPackInfo(null); setSort("price"); setStep(1);
   };
 
   const canVisit = (s: Step): boolean =>
@@ -223,6 +270,7 @@ export function App() {
   if (step === 2 && result && extraction) {
     screen = (
       <VerifyScreen
+        key={verifyKey}
         headRef={headRef} source={source} readBy={readBy} aiName={aiName} photo={photo} result={result}
         chosenId={chosenId} setChosenId={(id) => { setChosenId(id); }} ack={ack} setAck={setAck}
         editing={editing} draft={draft ?? extraction} setDraft={setDraft}
@@ -231,14 +279,16 @@ export function App() {
         rechecking={rechecking} onRecheck={recheck} onConfirm={confirm}
         onRetake={() => { onRemove(); setManualOpen(false); setStep(1); }}
         onManual={() => { setManualOpen(true); setStep(1); }}
+        onCompareByPack={compareByPack}
       />
     );
   } else if (step === 3 && confirmed) {
     screen = (
       <CompareScreen
-        headRef={headRef} state={compState} data={comparison} onRetry={() => loadComparison(confirmed.record.medicine_id)}
+        headRef={headRef} state={compState} data={comparison}
+        onRetry={() => (confirmed.record.medicine_id === "user_pack" && packInfo ? compareByPack(packInfo.f, packInfo.mrp, packInfo.pack, packInfo.brand) : loadComparison(confirmed.record.medicine_id))}
         selectedId={selectedId} onSelect={(id) => { setSelectedId(id); setSummaryReady(false); }} sort={sort} setSort={setSort}
-        onNext={() => setStep(4)} onNew={reset} catalogue={catalogue}
+        onNext={() => { setStep(4); track("savings_viewed"); }} onNew={reset} catalogue={DEMO ? catalogue : null}
       />
     );
   } else if (step === 4 && current && alt && outcome) {
@@ -247,21 +297,42 @@ export function App() {
         headRef={headRef} current={current} alternative={alt}
         unitsPerDay={unitsPerDay} setUnitsPerDay={(n) => { setUnitsPerDay(n); setSummaryReady(false); }}
         basis={effBasis} setBasis={setBasis} bases={bases} outcome={outcome}
-        onNext={() => { setSummaryReady(true); setStep(5); }} onChooseOther={() => setStep(3)}
+        onNext={() => { setSummaryReady(true); setStep(5); track("summary_ready", { saving: outcome?.ok ? outcome.monthlySaving : null }); }} onChooseOther={() => setStep(3)}
       />
     );
   } else if (step === 5 && current && alt && comparison && confirmed) {
     const summary = buildSummary({
       current, alternatives: comparison.alternatives, selectedId, basis: effBasis,
-      unitsPerDay: outcome?.ok ? unitsPerDay : null, outcome, how: confirmed.how, prepared: new Date(), aiName,
+      unitsPerDay: outcome?.ok ? unitsPerDay : null, outcome, how: confirmed.how, prepared: new Date(), aiName, demo: DEMO,
     }, t, lang);
-    screen = <SummaryScreen headRef={headRef} summary={summary} downloader={downloader} canPrint={canPrint} onNew={reset} />;
+    const monthly = outcome?.ok && outcome.monthlySaving > 0 ? outcome.monthlySaving : null;
+    const savingText = outcome?.ok && monthly ? `${inr(outcome.monthlySaving)}/month (${inr(outcome.annualSaving)}/year)` : null;
+    const siteUrl = DEMO ? "" : location.origin;
+    const savedKey = confirmed.record.medicine_id === "user_pack" && packInfo ? `pack:${packInfo.f.active_ingredients.join("+")}:${packInfo.f.strength}:${packInfo.f.release_type}` : confirmed.record.medicine_id;
+    const isSaved = saved.some((x) => x.key === savedKey);
+    const onSave = () => {
+      const entry: SavedMed = confirmed.record.medicine_id === "user_pack" && packInfo
+        ? { key: savedKey, kind: "pack", brand: packInfo.brand, formulation: packInfo.f, mrp: packInfo.mrp, pack: packInfo.pack, altName: alt.brand_name, monthlySaving: monthly, savedAt: new Date().toISOString() }
+        : { key: savedKey, kind: "catalogue", brand: confirmed.record.brand_name, record: confirmed.record, altName: alt.brand_name, monthlySaving: monthly, savedAt: new Date().toISOString() };
+      const next = [entry, ...saved.filter((x) => x.key !== savedKey)];
+      setSaved(next); storeSaved(next); track("saved_medicine");
+    };
+    screen = (
+      <SummaryScreen
+        headRef={headRef} summary={summary} downloader={downloader} canPrint={canPrint} onNew={reset}
+        shareText={t.shareText(current.brand_name, alt.brand_name, savingText, siteUrl)} onShared={() => track("shared_whatsapp")}
+        isSaved={isSaved} onSave={onSave}
+        feedbackContext={{ medicine_name: current.brand_name, alternative_name: alt.brand_name, monthly_saving: monthly, lang }}
+        canSendFeedback={!DEMO}
+      />
+    );
   } else {
     screen = (
       <HomeScreen
         headRef={headRef} pickerRef={pickerRef} photo={photo} fileError={fileError} onFile={onFile} onRemove={onRemove}
         scenario={scenario} setScenario={setScenario} onSample={onSample} phase={phase} identifyError={identifyError} onIdentify={identify} aiName={aiName}
         manualOpen={manualOpen} setManualOpen={setManualOpen} onManualPick={onManualPick}
+        demo={DEMO} saved={saved} onRecheck={recheckSaved} onRemoveSaved={removeSaved} checks={checks}
       />
     );
   }
@@ -276,7 +347,7 @@ export function App() {
               <span className="logo-mark"><Icon name="pill" size={18} /></span>
               <span className="logo-word">Dawa<span>Compare</span></span>
             </button>
-            <span className="proto-pill">{t.demoPill}</span>
+            {DEMO && <span className="proto-pill">{t.demoPill}</span>}
             <div className="lang" role="group" aria-label={t.langLabel}>
               <button type="button" aria-pressed={lang === "en"} className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>EN</button>
               <button type="button" aria-pressed={lang === "hi"} className={lang === "hi" ? "on" : ""} onClick={() => setLang("hi")} lang="hi">हिंदी</button>
