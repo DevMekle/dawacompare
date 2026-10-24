@@ -27,8 +27,8 @@ function parseExtraction(x: any): Extraction | null {
 export default async function handler(req: Req, res: Res) {
   res.setHeader("Cache-Control", "no-store");
   const url = new URL(req.url ?? "/", "http://localhost");
-  const store = getStore();
   try {
+    const store = getStore();
     if (req.method === "GET") {
       const action = url.searchParams.get("action");
       if (action === "status") return res.status(200).json(await store.describe());
