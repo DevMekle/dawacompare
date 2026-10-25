@@ -167,3 +167,24 @@ build.mjs                bundles everything into one HTML page
 ## Not in scope
 
 Medicine sales, checkout or delivery; prescriptions, diagnosis or dose advice; switching recommendations; live availability; accounts; storing personal or medical data.
+
+## Accounts and DawaCompare Plus
+
+The live site asks people to sign in with their mobile number and a 6-digit SMS code (`/api/account`). Demo mode (`?demo`) skips sign-in.
+
+| Plan | What it includes |
+| --- | --- |
+| Free | Check medicines, compare prices, share and download reports, save medicines on this device |
+| Plus (₹49/month, **test mode**) | Medicines on all devices, family profiles (up to 6), refill reminders, price-drop alerts |
+
+Setup (Vercel → Settings → Environment Variables):
+
+- `SESSION_SECRET`: a long random string (32+ characters). **Required**; without it sign-in is switched off and the app works without accounts.
+- `CRON_SECRET`: a random string; Vercel Cron uses it to call the daily reminder job (`vercel.json`, 09:00 IST).
+- SMS (optional; without it login runs in **test mode** and shows the code on screen):
+  - MSG91: `SMS_PROVIDER=msg91`, `MSG91_AUTHKEY`, `MSG91_OTP_TEMPLATE_ID`, `MSG91_REMINDER_TEMPLATE_ID` (DLT-approved templates)
+  - Twilio: `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`
+
+Database: run `db/schema.sql` again (adds `users`, `otp_codes`, `profiles`, `saved_medicines`). Only a hash of each code is stored; codes expire after 10 minutes and lock after 5 wrong tries. Deleting an account removes the phone number, profiles and saved medicines.
+
+Payments are not connected: "Start Plus" turns Plus on for 30 days without charging. Real payments need a payment gateway account (e.g. Razorpay) with business KYC.

@@ -41,8 +41,13 @@ export default async function handler(req: Req, res: Res) {
   const secret = process.env.SESSION_SECRET;
   if (!url || !secret || secret.length < 24) return res.status(503).json({ error: "not_configured" });
   const sql = neon(url);
-  const deps: A.Deps = { db: { query: (t, p) => sql(t, (p ?? []) as any[]) as Promise<any[]> }, secret, sms: smsFromEnv(), store: getStore() };
-  const now = new Date();
+  return handle(req, res, { db: { query: (t, p) => sql(t, (p ?? []) as any[]) as Promise<any[]> }, secret, sms: smsFromEnv(), store: getStore() });
+}
+
+/** The routes, given a database, secret and SMS sender (also used by the local test server). */
+export async function handle(req: Req, res: Res, deps: A.Deps) {
+  const secret = deps.secret;
+  const now = deps.now ? deps.now() : new Date();
   const uid = () => {
     const id = A.readToken(secret, cookieValue(req, COOKIE), now);
     if (id == null) throw new A.AccountError("not_signed_in", 401);

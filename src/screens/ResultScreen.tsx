@@ -48,8 +48,10 @@ interface Props {
   canPrint: boolean;
   shareText: string;
   onShared: () => void;
-  isSaved: boolean;
-  onSave: () => void;
+  isSaved: (profileId?: number) => boolean;
+  onSave: (profileId?: number) => void;
+  /** Plus: family profiles to save the medicine for; null on the free plan (saved on this device). */
+  profiles: { id: number; name: string }[] | null;
   feedbackContext: Record<string, unknown>;
   catalogue: { source: string; medicines: number } | null;
 }
@@ -111,6 +113,8 @@ export function ResultScreen(p: Props) {
   const [other, setOther] = useState(p.unitsPerDay != null && !DOSES.includes(p.unitsPerDay));
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saveFor, setSaveFor] = useState<number | undefined>(p.profiles?.[0]?.id);
+  const saved = p.isSaved(saveFor);
   const docRef = useRef<HTMLDivElement>(null);
 
   const head = <h1 ref={p.headRef} tabIndex={-1} className="visually-hidden">{p.mode === "compare" ? t.s3Title : t.s4Title}</h1>;
@@ -204,7 +208,12 @@ export function ResultScreen(p: Props) {
           <div className="secondary-row">
             {p.downloader.kind !== "none" && <button type="button" className="btn btn-quiet" onClick={download} disabled={busy}><Icon name="download" size={16} />{busy ? t.downloading : t.downloadReport}</button>}
             <button type="button" className="btn btn-quiet" onClick={copy}><Icon name="copy" size={16} />{t.copy}</button>
-            <button type="button" className="btn btn-quiet" onClick={p.onSave} disabled={p.isSaved} aria-pressed={p.isSaved}><Icon name={p.isSaved ? "check" : "plus"} size={16} />{p.isSaved ? t.savedMed : t.saveMed}</button>
+            {p.profiles && p.profiles.length > 1 && (
+              <select className="input input-sm save-for" aria-label={t.saveFor} value={saveFor} onChange={(e: any) => setSaveFor(Number(e.target.value))}>
+                {p.profiles.map((pr) => <option key={pr.id} value={pr.id}>{t.saveFor}: {pr.name}</option>)}
+              </select>
+            )}
+            <button type="button" className="btn btn-quiet" onClick={() => p.onSave(saveFor)} disabled={saved} aria-pressed={saved}><Icon name={saved ? "check" : "plus"} size={16} />{saved ? t.savedMed : t.saveMed}</button>
             {p.canPrint && <button type="button" className="btn btn-quiet" onClick={() => window.print()}><Icon name="printer" size={16} />{t.print}</button>}
             <button type="button" className="btn btn-quiet" onClick={p.onNew}><Icon name="rotate" size={16} />{t.newComparison}</button>
           </div>

@@ -11,8 +11,12 @@ import { buildSummary, ConfirmedHow } from "./summary/buildSummary";
 import { ScenarioId } from "./mock/scenarios";
 import { SAMPLE_PACKS } from "./mock/strips";
 import { Icon } from "./components/Icon";
+import { Spinner } from "./components/ui";
 import { Photo } from "./components/UploadPanel";
 import { HomeScreen, Phase } from "./screens/HomeScreen";
+import { LoginScreen } from "./screens/LoginScreen";
+import { AccountScreen, AlertList } from "./screens/AccountScreen";
+import { accountApi, Alert, CloudSaved, Me } from "./api/account";
 import { VerifyScreen, canConfirm } from "./screens/VerifyScreen";
 import { ResultScreen, Downloader } from "./screens/ResultScreen";
 
@@ -23,6 +27,8 @@ declare global {
 }
 
 type Step = 1 | 2 | 3 | 4;
+/** The live site requires sign-in. Demo mode (artifact, local file, ?demo) has no backend and skips it. */
+const LIVE = !DEMO && typeof location !== "undefined" && /^https?:$/.test(location.protocol);
 const MAX_BYTES = 15 * 1024 * 1024;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -71,6 +77,13 @@ export function App() {
   const [basis, setBasis] = useState<PriceType>("MRP");
   const [packInfo, setPackInfo] = useState<{ f: Formulation; mrp: number; pack: number; brand: string } | null>(null);
   const [saved, setSaved] = useState<SavedMed[]>(loadSaved);
+  // Accounts: "loading" while checking the session, "out" signed out, "na" when sign-in isn't available here.
+  const [auth, setAuth] = useState<Me | "loading" | "out" | "na">(LIVE ? "loading" : "na");
+  const user = typeof auth === "object" ? auth : null;
+  const plus = user?.plan === "plus";
+  const [cloud, setCloud] = useState<CloudSaved[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [view, setView] = useState<"app" | "account" | "plans">("app");
   const [checks, setChecks] = useState<number | null>(null);
 
   const [downloader, setDownloader] = useState<Downloader>(() => (window.claude?.use ? { kind: "pending" } : { kind: "native" }));
@@ -88,7 +101,17 @@ export function App() {
     api.visionAvailable().then(setVisionProvider, () => setVisionProvider(null));
     api.catalogueInfo().then(setCatalogue, () => setCatalogue(null));
     api.usageStats().then((s) => setChecks(s?.checks ?? null), () => setChecks(null));
+    if (LIVE) accountApi.me().then((r) => setAuth(r === null ? "out" : r === "unavailable" ? "na" : r.user), () => setAuth("na"));
   }, []);
+
+  useEffect(() => {
+    if (!plus) { setCloud([]); setAlerts([]); return; }
+    accountApi.saved().then((r) => setCloud(r.saved), () => setCloud([]));
+  }, [plus, user?.phone]);
+  useEffect(() => {
+    if (!plus) return;
+    accountApi.alerts().then((r) => setAlerts(r.alerts), () => setAlerts([]));
+  }, [plus, cloud]);
 
   /** Anonymous usage event (no personal data); ignored when there's no backend. */
   const track = (name: string, meta?: Record<string, unknown>) => { api.sendFeedback({ kind: "event", name, meta }); };
@@ -245,7 +268,15 @@ export function App() {
       setStep(3);
     }
   };
-  const removeSaved = (key: string) => { const next = saved.filter((x) => x.key !== key); setSaved(next); storeSaved(next); };
+  const removeSaved = (key: string) => {
+    if (key.startsWith("cloud:")) { accountApi.unsave(Number(key.slice(6))).then((r) => setCloud(r.saved), () => {}); return; }
+    const next = saved.filter((x) => x.key !== key); setSaved(next); storeSaved(next);
+  };
+  /** Plus: medicines come from the account (all devices), labelled with the family member. */
+  const homeSaved: SavedMed[] = plus
+    ? cloud.map((c) => ({ ...(c.data as SavedMed), key: `cloud:${c.id}`, profileName: user!.profiles.find((p) => p.id === c.profile_id)?.name }))
+    : saved;
+  const signOut = () => { setAuth("out"); setCloud([]); setAlerts([]); setView("app"); reset(); };
   const confirm = () => {
     if (!result || !canConfirm(result, chosenId, ack)) return; // hard guard: unable can never pass
     const record = result.status === "matched" ? result.record! : result.candidates.find((c) => c.medicine_id === chosenId)!;
@@ -312,14 +343,21 @@ export function App() {
     ].join("\n") : null;
     const siteUrl = DEMO ? "" : location.origin;
     const savedKey = confirmed.record.medicine_id === "user_pack" && packInfo ? `pack:${packInfo.f.active_ingredients.join("+")}:${packInfo.f.strength}:${packInfo.f.release_type}` : confirmed.record.medicine_id;
-    const isSaved = saved.some((x) => x.key === savedKey);
-    const onSave = () => {
+    const isSaved = (profileId?: number) => plus ? cloud.some((c) => c.key === savedKey && c.profile_id === profileId) : saved.some((x) => x.key === savedKey);
+    const onSave = (profileId?: number) => {
       if (!alt) return;
       const entry: SavedMed = confirmed.record.medicine_id === "user_pack" && packInfo
         ? { key: savedKey, kind: "pack", brand: packInfo.brand, formulation: packInfo.f, mrp: packInfo.mrp, pack: packInfo.pack, altName: alt.brand_name, monthlySaving: monthly, savedAt: new Date().toISOString() }
         : { key: savedKey, kind: "catalogue", brand: confirmed.record.brand_name, record: confirmed.record, altName: alt.brand_name, monthlySaving: monthly, savedAt: new Date().toISOString() };
+      track("saved_medicine");
+      if (plus && profileId != null) {
+        // Cheapest per-tablet price today, so a later drop can raise an alert.
+        const best = comparison?.alternatives.filter((a) => a.mrp?.freshness === "current" && a.mrp.per_unit != null).map((a) => a.mrp!.per_unit!).sort((a, b) => a - b)[0] ?? null;
+        accountApi.save({ profile_id: profileId, key: savedKey, data: entry, best_unit_price: best }).then((r) => setCloud(r.saved), () => {});
+        return;
+      }
       const next = [entry, ...saved.filter((x) => x.key !== savedKey)];
-      setSaved(next); storeSaved(next); track("saved_medicine");
+      setSaved(next); storeSaved(next);
     };
     screen = (
       <ResultScreen
@@ -332,7 +370,7 @@ export function App() {
         basis={effBasis} setBasis={setBasis} bases={bases} outcome={outcome}
         summary={summary} downloader={downloader} canPrint={canPrint}
         shareText={current && alt ? t.shareText(current.brand_name, alt.brand_name, savingText, siteUrl, calc) : ""} onShared={() => track("shared_whatsapp")}
-        isSaved={isSaved} onSave={onSave}
+        isSaved={isSaved} onSave={onSave} profiles={plus ? user!.profiles : null}
         feedbackContext={{ medicine_name: current?.brand_name, alternative_name: alt?.brand_name, monthly_saving: monthly, lang }}
         catalogue={DEMO ? catalogue : null}
       />
@@ -343,11 +381,20 @@ export function App() {
         headRef={headRef} pickerRef={pickerRef} photo={photo} fileError={fileError} onFile={onFile} onRemove={onRemove}
         scenario={scenario} setScenario={setScenario} onSample={onSample} phase={phase} identifyError={identifyError} onIdentify={identify} aiName={aiName}
         manualOpen={manualOpen} setManualOpen={setManualOpen} onManualPick={onManualPick} onIdentifyName={visionLive ? identifyName : undefined}
-        demo={DEMO} saved={saved} onRecheck={recheckSaved} onRemoveSaved={removeSaved} checks={checks} coverage={catalogue?.medicines ?? null}
+        demo={DEMO} saved={homeSaved} alerts={plus && alerts.length ? <AlertList alerts={alerts} user={user!} /> : null} onRecheck={recheckSaved} onRemoveSaved={removeSaved} checks={checks} coverage={catalogue?.medicines ?? null}
       />
     );
   }
-  const shownStep: Step = screen.type === HomeScreen ? 1 : step;
+  if (user && view !== "app") {
+    screen = (
+      <AccountScreen headRef={headRef} view={view} setView={setView} user={user} setUser={(u) => setAuth(u)} saved={cloud} setSaved={setCloud} alerts={alerts}
+        onBack={() => setView("app")} onRecheck={(c) => { setView("app"); recheckSaved(c.data as SavedMed); }} onSignedOut={signOut} />
+    );
+  }
+  if (auth === "loading") screen = <section className="screen"><p className="muted" role="status"><Spinner /></p></section>;
+  if (auth === "out") screen = <LoginScreen headRef={headRef} onSignedIn={(u) => { setAuth(u); setView("app"); }} />;
+  const gated = auth === "loading" || auth === "out" || (user && view !== "app");
+  const shownStep: Step = screen.type === HomeScreen || gated ? 1 : step;
 
   return (
     <I18nProvider value={{ t, lang }}>
@@ -359,6 +406,11 @@ export function App() {
               <span className="logo-word">Dawa<span>Compare</span></span>
             </button>
             {DEMO && <span className="proto-pill">{t.demoPill}</span>}
+            {user && (
+              <button type="button" className={`acct-btn ${plus ? "is-plus" : ""}`} onClick={() => setView(view === "app" ? "account" : "app")} aria-label={t.acOpen}>
+                <Icon name={plus ? "star" : "user"} size={18} /><span className="acct-label">{t.acOpen}</span>
+              </button>
+            )}
             <div className="lang" role="group" aria-label={t.langLabel}>
               <button type="button" aria-pressed={lang === "en"} className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>EN</button>
               <button type="button" aria-pressed={lang === "hi"} className={lang === "hi" ? "on" : ""} onClick={() => setLang("hi")} lang="hi">हिंदी</button>
@@ -366,7 +418,7 @@ export function App() {
           </div>
         </header>
 
-        <div className="layout">
+        <div className={`layout ${gated ? "is-gated" : ""}`}>
           <aside className="rail">
             <nav aria-label={t.step(shownStep)}>
               <ol className="rail-steps">

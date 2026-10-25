@@ -21,7 +21,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // functions/account.ts
 var account_exports = {};
 __export(account_exports, {
-  default: () => handler
+  default: () => handler,
+  handle: () => handle
 });
 module.exports = __toCommonJS(account_exports);
 
@@ -6444,8 +6445,11 @@ async function handler(req, res) {
   const secret = process.env.SESSION_SECRET;
   if (!url || !secret || secret.length < 24) return res.status(503).json({ error: "not_configured" });
   const sql = Ys(url);
-  const deps = { db: { query: (t, p2) => sql(t, p2 ?? []) }, secret, sms: smsFromEnv(), store: getStore() };
-  const now = /* @__PURE__ */ new Date();
+  return handle(req, res, { db: { query: (t, p2) => sql(t, p2 ?? []) }, secret, sms: smsFromEnv(), store: getStore() });
+}
+async function handle(req, res, deps) {
+  const secret = deps.secret;
+  const now = deps.now ? deps.now() : /* @__PURE__ */ new Date();
   const uid = () => {
     const id = readToken(secret, cookieValue(req, COOKIE), now);
     if (id == null) throw new AccountError("not_signed_in", 401);
@@ -6509,4 +6513,8 @@ async function handler(req, res) {
     return res.status(500).json({ error: "account_error" });
   }
 }
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  handle
+});
 module.exports = module.exports.default;

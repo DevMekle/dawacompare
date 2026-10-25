@@ -13,6 +13,8 @@ export interface SavedMed {
   altName?: string;
   monthlySaving?: number | null;
   savedAt: string;
+  /** Plus: the family member this medicine is saved for. */
+  profileName?: string;
 }
 
 const KEY = "dc-saved-meds";

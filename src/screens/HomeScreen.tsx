@@ -75,6 +75,8 @@ interface Props {
   /** Demo mode shows sample packs and simulated readings. */
   demo: boolean;
   saved: SavedMed[];
+  /** Plus: price-drop and refill alerts, shown above the saved medicines. */
+  alerts?: any;
   onRecheck: (m: SavedMed) => void;
   onRemoveSaved: (key: string) => void;
   /** Total comparisons made on the live site, or null. */
@@ -113,7 +115,6 @@ export function HomeScreen(p: Props) {
           <li><Icon name="ban" size={16} />{t.trustNoSell}</li>
         </ul>
         <ul className="hero-points">
-          <li><Icon name="check" size={16} />{t.noSignup}</li>
           {p.coverage != null && p.coverage > 0 && <li><Icon name="database" size={16} />{t.coverage(p.coverage)}</li>}
           {p.checks != null && p.checks > 0 && <li><Icon name="listChecks" size={16} />{t.checksSoFar(p.checks)}</li>}
         </ul>
@@ -201,6 +202,7 @@ export function HomeScreen(p: Props) {
         </div>
       )}
 
+      {!busy && p.alerts}
       {!busy && p.saved.length > 0 && (
         <div className="saved">
           <div className="saved-head"><strong>{t.myMedsTitle}</strong><span className="muted small">{t.myMedsHint}</span></div>
@@ -208,7 +210,7 @@ export function HomeScreen(p: Props) {
             {p.saved.map((m) => (
               <li key={m.key} className="saved-item">
                 <div className="saved-main">
-                  <strong>{m.brand}</strong>
+                  <strong>{m.brand}{m.profileName && <span className="chip chip-mute saved-who"><Icon name="user" size={12} />{m.profileName}</span>}</strong>
                   <span className="muted small">{m.altName ? `→ ${m.altName}` : ""}{m.monthlySaving ? ` · ${t.savedSaving(inr(m.monthlySaving))}` : ""}</span>
                 </div>
                 <div className="saved-actions">
