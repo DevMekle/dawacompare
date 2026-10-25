@@ -77,8 +77,15 @@ export function VerifyScreen(p: Props) {
   // Not in the catalogue: show what was identified, then compare by salt (formulation listed) or say we have no data.
   const noRecord = r.status === "unable" && r.reason === "no_record" && p.source !== "manual";
   const matches = noRecord ? r.formulation_matches ?? [] : [];
-  const needStrength = noRecord && !p.extraction.strength.value;
-  const noData = noRecord && matches.length === 0 && !needStrength;
+  // Only tablets and capsules with a named salt can be compared today. Syrups, creams and
+  // herbal / Ayurvedic products (no salt on the pack) get a plain answer instead of a dead end.
+  const identified = p.source !== "manual" && !p.editing;
+  const formRead = p.extraction.dosage_form.value;
+  const unsupported = identified && !!formRead && !["Tablet", "Capsule"].includes(formRead);
+  const noSalt = identified && !unsupported && !p.extraction.active_ingredients.value && r.status === "unable";
+  const outOfScope = unsupported || noSalt;
+  const needStrength = noRecord && !outOfScope && !p.extraction.strength.value;
+  const noData = noRecord && !outOfScope && matches.length === 0 && !needStrength;
   const releaseOptions = Array.from(new Set(matches.map((m) => m.release_type))) as ReleaseType[];
   const [packRelease, setPackRelease] = useState<ReleaseType | null>(releaseOptions.length === 1 ? releaseOptions[0] : null);
   const [packMrp, setPackMrp] = useState("");
@@ -96,13 +103,15 @@ export function VerifyScreen(p: Props) {
     <section className="screen">
       <ScreenHead headRef={p.headRef} title={t.s2Title} body={t.s2Body} />
 
-      {!p.editing && !p.rechecking && noRecord && <IdentityCard ex={p.extraction} maker={p.maker} />}
+      {!p.editing && !p.rechecking && (noRecord || outOfScope) && <IdentityCard ex={p.extraction} maker={p.maker} />}
 
       {p.rechecking ? (
         <div className="banner banner-info" role="status"><span className="banner-icon"><Spinner /></span><div className="banner-text"><strong>{t.phases.verifying}</strong></div></div>
       ) : (
         matches.length > 0
           ? <StatusBanner tone="info" icon="info" title={t.packBannerTitle} body={t.packBannerBody} />
+          : unsupported ? <StatusBanner tone="info" icon="info" title={t.formNotCoveredTitle(formRead!)} body={t.formNotCoveredBody} />
+          : noSalt ? <StatusBanner tone="info" icon="info" title={t.noSaltTitle} body={t.noSaltBody} />
           : needStrength ? <StatusBanner tone="warn" icon="help" title={t.needStrengthTitle} body={t.needStrengthBody} />
           : noData ? <StatusBanner tone="info" icon="info" title={t.noDataTitle} body={t.noDataBody} />
           : <StatusBanner tone={TONE[r.status]} icon={ICON[r.status]} title={title} body={r.status === "unable" && r.reason ? t.unableReasons[r.reason] : body} />
@@ -145,7 +154,7 @@ export function VerifyScreen(p: Props) {
           <FieldEditor draft={p.draft} onChange={p.setDraft} />
           <Notice tone="info" icon="pencil">{t.editedNote}</Notice>
         </div>
-      ) : noRecord ? null : (
+      ) : noRecord || outOfScope ? null : (
         <>
           <VerificationChecks checks={r.checks} />
           <p className="muted small read-note"><Icon name="info" size={14} />{t.readNote}</p>
@@ -167,7 +176,7 @@ export function VerifyScreen(p: Props) {
       <ActionBar
         hint={
           !p.editing && matches.length > 0 && !packOk ? <p className="bar-hint">{t.packNeed}</p>
-          : !p.editing && r.status === "unable" && !noData && matches.length === 0 ? <p className="bar-hint">{t.blockedHint}</p>
+          : !p.editing && r.status === "unable" && !noData && !outOfScope && matches.length === 0 ? <p className="bar-hint">{t.blockedHint}</p>
           : !p.editing && r.status === "needs_confirmation" && !ok ? <p className="bar-hint">{t.pickHint}</p>
           : null
         }
@@ -176,6 +185,8 @@ export function VerifyScreen(p: Props) {
           <button type="button" className="btn btn-primary" onClick={p.onRecheck} disabled={p.rechecking}><Icon name="shieldCheck" size={20} />{t.checkAgain}</button>
         ) : matches.length > 0 ? (
           <button type="button" className={`btn btn-primary ${packOk ? "" : "is-blocked"}`} aria-disabled={!packOk} onClick={comparePack}><Icon name="arrowRight" size={20} />{t.packCta}</button>
+        ) : outOfScope ? (
+          <button type="button" className="btn btn-primary" onClick={p.onNew}><Icon name="rotate" size={20} />{t.noDataCta}</button>
         ) : needStrength ? (
           <button type="button" className="btn btn-primary" onClick={p.startEdit}><Icon name="pencil" size={20} />{t.needStrengthCta}</button>
         ) : noData ? (

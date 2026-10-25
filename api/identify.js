@@ -36,7 +36,7 @@ Extract ONLY what is printed on the pack. Never guess, infer or fill in from gen
 - manufacturer: the company that markets the product ("Marketed by"), or the manufacturer if no marketer is printed, e.g. "Cadila Pharmaceuticals Ltd".
 - active_ingredients: the salt name(s) as printed, joined with " + " for combinations. Drop pharmacopoeia marks like I.P., B.P., U.S.P. (e.g. "Cetirizine").
 - strength: amount per unit with unit, e.g. "10 mg" or "40 mg + 12.5 mg".
-- dosage_form: "Tablet", "Capsule", or "Other".
+- dosage_form: "Tablet", "Capsule", "Syrup" (any oral liquid: syrup, suspension, drops), or "Other" (cream, gel, injection, inhaler, sachet\u2026).
 - release_type: use a code ONLY if a release marking is printed: SR (sustained), ER (ER/XR/extended/prolonged), MR (MR/CR/modified/controlled), DR (DR/EC/delayed/enteric-coated), IR only if "immediate release" is printed. If no marking is printed, value null and read "not_found".
 - read: "clear" if the text is plainly legible, "unclear" if partly obscured, blurred or you are not certain, "not_found" if not visible (value null).
 - is_medicine_pack: false if the photo is not a medicine strip, bottle or box; then set every value null and read "not_found".
@@ -48,13 +48,13 @@ var NAME_INSTRUCTIONS = `A user in India typed the name of a medicine they buy. 
 - manufacturer: the company that markets it, if you know it; otherwise null.
 - active_ingredients: the salt(s), joined with " + " for combinations (e.g. "Telmisartan").
 - strength: per unit with unit (e.g. "40 mg"). Use the strength typed by the user if given; if not typed and the product has several strengths, null.
-- dosage_form: "Tablet", "Capsule", or "Other".
+- dosage_form: "Tablet", "Capsule", "Syrup" (any oral liquid: syrup, suspension, drops), or "Other" (cream, gel, injection, inhaler, sachet\u2026).
 - release_type: SR, ER, MR or DR only if the product name or the product itself is sustained/extended/modified/delayed release (e.g. "SR", "XR", "CR", "OD", "EC" in the name); IR if it is a plain tablet or capsule; null if unsure.
 - read: "clear" if you are confident about that field, "unclear" if not, "not_found" when the value is null.
 - is_medicine_pack: true when recognized is true.
 Return JSON only. Do not give any medical advice.`;
 var FIELDS = ["brand_name", "manufacturer", "active_ingredients", "strength", "dosage_form", "release_type"];
-var ENUMS = { dosage_form: ["Tablet", "Capsule", "Other"], release_type: ["IR", "SR", "ER", "MR", "DR"] };
+var ENUMS = { dosage_form: ["Tablet", "Capsule", "Syrup", "Other"], release_type: ["IR", "SR", "ER", "MR", "DR"] };
 var openaiField = (k) => ({
   type: "object",
   additionalProperties: false,
