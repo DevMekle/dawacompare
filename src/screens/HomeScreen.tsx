@@ -6,6 +6,7 @@ import { Icon } from "../components/Icon";
 import { ActionBar, Notice, Spinner } from "../components/ui";
 import { UploadPanel, Photo } from "../components/UploadPanel";
 import { ManualSearch } from "../components/ManualSearch";
+import { ExampleComparison } from "../components/ExampleComparison";
 import { SavedMed } from "../lib/savedMeds";
 import { inr } from "../lib/format";
 
@@ -65,13 +66,25 @@ export function HomeScreen(p: Props) {
         <p className="eyebrow">{t.s1Eyebrow}</p>
         <h1 ref={p.headRef} tabIndex={-1} className="hero-title">{t.s1Title}</h1>
         <p className="lede">{t.s1Body}</p>
+        {!busy && !p.photo && (
+          <button type="button" className="btn btn-primary hero-cta" onClick={() => { const el = document.getElementById("check"); el?.scrollIntoView({ behavior: "smooth", block: "start" }); el?.focus({ preventScroll: true }); }}>
+            <Icon name="scan" size={20} />{t.checkCta}
+          </button>
+        )}
+        <ul className="trust-points">
+          <li><Icon name="clock" size={16} />{t.trustSource}</li>
+          <li><Icon name="shieldCheck" size={16} />{t.trustNoSell}</li>
+        </ul>
         <ul className="hero-points">
           <li><Icon name="check" size={16} />{t.noSignup}</li>
-          <li><Icon name="check" size={16} />{t.sameFormulation}</li>
           {p.coverage != null && p.coverage > 0 && <li><Icon name="database" size={16} />{t.coverage(p.coverage)}</li>}
           {p.checks != null && p.checks > 0 && <li><Icon name="listChecks" size={16} />{t.checksSoFar(p.checks)}</li>}
         </ul>
       </div>
+
+      {!busy && !p.photo && <ExampleComparison />}
+
+      <div id="check" tabIndex={-1} />
 
       {busy ? (
         <div className="pipeline" role="status" aria-live="polite">

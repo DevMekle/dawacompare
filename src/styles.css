@@ -671,3 +671,16 @@ details[open] .chev { transform: rotate(180deg); }
 .btn-primary.btn-wa { color: var(--on-primary); }
 .price-pack { font-size: 13px; color: var(--muted); }
 .med-current .price-pack { color: var(--on-teal-muted); }
+
+/* ---- Home page: call to action, trust signals, example comparison */
+.hero-cta { margin-top: 16px; }
+.trust-points { list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-direction: column; gap: 8px; font-size: 14.5px; font-weight: 550; color: var(--ink); }
+.trust-points li { display: flex; align-items: flex-start; gap: 8px; }
+.trust-points svg { color: var(--mint-ink); flex: none; margin-top: 2px; }
+.example { border: 1px solid var(--line); background: var(--surface); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.example-title { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14.5px; color: var(--mint-ink); }
+.example p { margin: 0; }
+.ex-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); font-size: 15px; }
+.ex-alt { background: var(--mint-wash); }
+.ex-save { font-weight: 700; font-size: 15.5px; }
+.ex-row span { white-space: nowrap; }
