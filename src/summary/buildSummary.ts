@@ -32,6 +32,8 @@ export interface Summary {
   estimate: { heading: string; rows: [string, string][]; highlight: [string, string][]; note: string | null };
   assumptions: { heading: string; items: string[] };
   notes: string[];
+  /** Sample data: the report carries a SAMPLE DATA tag. */
+  demo: boolean;
 }
 
 export function priceText(q: PriceQuote | null, t: Strings, lang: Lang): string {
@@ -79,7 +81,7 @@ export function buildSummary(s: SummaryInput, t: Strings, lang: Lang): Summary {
       a.actual_selling_price ? priceText(a.actual_selling_price, t, lang) : "—",
       perUnit(a, s.basis),
       provenance(a, t, lang),
-      a.medicine_id.startsWith("ja_") ? `${t.jaBadge}: ${t.jaNote}` : t.reviewNote,
+      a.medicine_id.startsWith("ja_") ? `${t.jaBadge}: ${t.jaNote}` : a.medicine_id.startsWith("real_") ? `${t.brandBadge}: ${t.brandNote}` : t.reviewNote,
     ],
   }));
 
@@ -118,6 +120,7 @@ export function buildSummary(s: SummaryInput, t: Strings, lang: Lang): Summary {
     },
     estimate: { heading: t.rptEstimate, rows: est, highlight, note },
     assumptions: { heading: t.assumptionsTitle, items: [t.formulaMonthly, t.formulaAnnual, ...t.assumptions(t.priceTypes[s.basis])] },
+    demo: !!s.demo,
     notes: [t.caution, t.rptReminder, s.demo ? t.rptReview : t.rptReviewReal, s.demo ? t.sampleNote : t.realNote, t.rptPrivacy],
   };
 }
@@ -125,7 +128,7 @@ export function buildSummary(s: SummaryInput, t: Strings, lang: Lang): Summary {
 const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string);
 
 export function summaryToText(s: Summary, t: Strings): string {
-  const L: string[] = [`${t.brand} — ${s.title}`, `*** ${t.demoData} ***`, s.prepared, "", `## ${s.confirmed.heading}`];
+  const L: string[] = [`${t.brand} — ${s.title}`, ...(s.demo ? [`*** ${t.demoData} ***`] : []), s.prepared, "", `## ${s.confirmed.heading}`];
   s.confirmed.rows.forEach(([k, v]) => L.push(`${k}: ${v}`));
   L.push("", `## ${s.alternatives.heading}`);
   if (s.alternatives.empty) L.push(s.alternatives.empty);
@@ -167,7 +170,7 @@ tbody th { width: 34%; color: #3D4F4A; font-weight: 600; }
 .note { border: 1px solid #E8C98A; background: #FFF7E6; border-radius: 8px; padding: 10px 12px; margin-top: 18px; }
 ul { margin: 0; padding-left: 18px; }
 </style></head><body><div class="wrap">
-<header><div><div class="brand">${esc(t.brand)}</div><h1>${esc(s.title)}</h1><div class="muted">${esc(s.prepared)}</div></div><div class="tag">${esc(t.demoData)}</div></header>
+<header><div><div class="brand">${esc(t.brand)}</div><h1>${esc(s.title)}</h1><div class="muted">${esc(s.prepared)}</div></div>${s.demo ? `<div class="tag">${esc(t.demoData)}</div>` : ""}</header>
 <h2>${esc(s.confirmed.heading)}</h2><table><tbody>${kv(s.confirmed.rows)}</tbody></table>
 <h2>${esc(s.alternatives.heading)}</h2>${alts}
 <h2>${esc(s.estimate.heading)}</h2><table><tbody>${kv(s.estimate.rows)}</tbody></table>

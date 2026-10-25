@@ -656,3 +656,16 @@ details[open] .chev { transform: rotate(180deg); }
 /* The hint above the sticky button sits on a solid background so page text doesn't show through it. */
 .action-bar { background: var(--bg); box-shadow: 0 -10px 12px -6px var(--bg); }
 @media (min-width: 1000px) { .action-bar { background: none; box-shadow: none; } }
+
+/* Step 3: savings on the same screen as the alternatives */
+.dose-card { display: flex; flex-direction: column; gap: 10px; }
+.save-card { display: flex; flex-direction: column; gap: 8px; border-color: var(--mint); background: var(--mint-wash); }
+.save-with { margin: 0; font-weight: 650; }
+.save-none { margin: 0; font-size: 18px; font-weight: 650; }
+.save-card .save-hero { margin: 0; }
+.print-only { display: none; }
+@media print {
+  .screen > :not(.print-only) { display: none !important; }
+  .print-only { display: block !important; }
+}
+.btn-primary.btn-wa { color: var(--on-primary); }

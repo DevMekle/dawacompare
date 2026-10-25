@@ -39,6 +39,8 @@ interface Props {
   onRemoveSaved: (key: string) => void;
   /** Total comparisons made on the live site, or null. */
   checks: number | null;
+  /** How many medicines the catalogue covers (live database), shown on the home screen. */
+  coverage: number | null;
 }
 
 export function HomeScreen(p: Props) {
@@ -66,6 +68,7 @@ export function HomeScreen(p: Props) {
         <ul className="hero-points">
           <li><Icon name="check" size={16} />{t.noSignup}</li>
           <li><Icon name="check" size={16} />{t.sameFormulation}</li>
+          {p.coverage != null && p.coverage > 0 && <li><Icon name="database" size={16} />{t.coverage(p.coverage)}</li>}
           {p.checks != null && p.checks > 0 && <li><Icon name="listChecks" size={16} />{t.checksSoFar(p.checks)}</li>}
         </ul>
       </div>

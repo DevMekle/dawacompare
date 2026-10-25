@@ -26,7 +26,6 @@ function QuoteRow({ label, q }: { label: string; q: PriceQuote | null }) {
         <span className="pq-amt">
           <span className="pq-num">{inr(q.amount, true)}</span>
           <span className="pq-pack"> / {q.pack_quantity}</span>
-          {q.per_unit != null && <span className="pq-unit">{inr(q.per_unit, true)} {t.perTab}</span>}
         </span>
       )}
       {chip}

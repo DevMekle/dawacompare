@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import handler from "../functions/identify";
 delete process.env.GEMINI_API_KEY; delete process.env.VISION_PROVIDER;
-import { toExtraction, toIdentified } from "../src/api/client";
+import { toExtraction, toIdentified, keepOnlyWhatWasTyped } from "../src/api/client";
 import { isSaltName } from "../src/domain/normalize";
 
 type Captured = { url?: string; init?: any };
@@ -190,6 +190,17 @@ const test = async (name: string, fn: () => Promise<void>) => { await fn(); pass
       assert.equal(out.code, 400, text);
       assert.equal(out.body.error, "bad_text");
     }
+  });
+
+
+  await test("typed name: never keeps a strength or brand the customer didn't type", async () => {
+    const F = (v: string | null) => ({ value: v, read: (v ? "clear" : "not_found") as any });
+    const ex = (brand: string, strength: string | null) => ({ brand_name: F(brand), active_ingredients: F("Sildenafil"), strength: F(strength), dosage_form: F("Tablet"), release_type: F(null) });
+    assert.equal(keepOnlyWhatWasTyped("Viagra", ex("Viagra", "50 mg")).strength.value, null);
+    assert.equal(keepOnlyWhatWasTyped("viagra 100", ex("Viagra", "100 mg")).strength.value, "100 mg");
+    assert.equal(keepOnlyWhatWasTyped("viagra 100", ex("Viagra", "50 mg")).strength.value, null);
+    assert.equal(keepOnlyWhatWasTyped("sildenafil 50", ex("Viagra", "50 mg")).brand_name.value, "sildenafil 50");
+    assert.equal(keepOnlyWhatWasTyped("Telcure 40", ex("Telcure", "40 mg")).brand_name.value, "Telcure");
   });
 
   await test("a pack sold under its salt name is recognised as a generic", async () => {

@@ -35,6 +35,22 @@ export function toExtraction(r: any): Extraction {
   return { brand_name: f("brand_name"), active_ingredients: f("active_ingredients"), strength: f("strength"), dosage_form: f("dosage_form"), release_type: f("release_type") };
 }
 
+/**
+ * Never assume what the customer didn't type: a strength is kept only if its numbers were typed
+ * (Viagra comes in 25, 50 and 100 mg), and a brand only if it resembles the typed name.
+ */
+export function keepOnlyWhatWasTyped(name: string, ex: Extraction): Extraction {
+  const typed = name.toLowerCase();
+  const s = ex.strength.value;
+  const nums = s?.match(/\d+(?:\.\d+)?/g) ?? [];
+  const typedNums: string[] = typed.match(/\d+(?:\.\d+)?/g) ?? [];
+  if (s && !nums.every((n) => typedNums.includes(n))) ex.strength = { value: null, read: "not_found" };
+  const b = ex.brand_name.value;
+  const key = (x: string) => x.toLowerCase().replace(/[^a-z]/g, "").slice(0, 4);
+  if (b && key(b).length >= 3 && !typed.replace(/[^a-z]/g, "").includes(key(b))) ex.brand_name = { value: name.replace(/\s+/g, " ").trim(), read: "user" };
+  return ex;
+}
+
 export function toIdentified(r: any): Identified {
   const m = typeof r?.manufacturer?.value === "string" ? r.manufacturer.value.trim() : "";
   return { extraction: toExtraction(r), maker: m || null };
@@ -149,6 +165,7 @@ export const mockApi: DawaApi = {
     if (!r.ok) throw new Error(j?.error === "bad_text" ? "not_recognised" : visionErrorFrom(j));
     const out = toIdentified(j?.result);
     if (j?.result?.recognized === false || !out.extraction.active_ingredients.value) throw new Error("not_recognised");
+    keepOnlyWhatWasTyped(name, out.extraction);
     // Identified from general knowledge, not read from a pack: every field must be checked by the customer.
     for (const k of Object.keys(out.extraction) as (keyof Extraction)[]) if (out.extraction[k].value) out.extraction[k].read = "unclear";
     return out;

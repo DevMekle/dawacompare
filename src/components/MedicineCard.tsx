@@ -20,14 +20,13 @@ interface Props {
   variant: "current" | "alternative";
   selected?: boolean;
   onSelect?: () => void;
-  /** Price per tablet of the current medicine, to show the difference. */
-  compareTo?: number | null;
+  /** Monthly saving against the customer's medicine at the chosen tablets a day, when it can be worked out. */
+  monthlySaving?: number | null;
 }
 
-export function MedicineCard({ product: p, variant, selected, onSelect, compareTo }: Props) {
+export function MedicineCard({ product: p, variant, selected, onSelect, monthlySaving }: Props) {
   const { t } = useI18n();
   const unit = p.mrp?.per_unit ?? null;
-  const diff = compareTo != null && unit != null ? compareTo - unit : null;
   const priced = p.mrp?.freshness === "current";
   const reviewed = p.review_status === "approved" && p.verification_status === "verified";
   const isJA = p.medicine_id.startsWith("ja_");
@@ -46,11 +45,11 @@ export function MedicineCard({ product: p, variant, selected, onSelect, compareT
         <div className="price">
           <span className={`price-big ${unit == null ? "is-na" : ""}`}>{unit == null ? "—" : inr(unit, true)}</span>
           <span className="price-unit">{t.perTab} · {t.priceTypes.MRP}</span>
-          {diff != null && diff > 0.004 && <span className="price-diff">−{inr(diff, true)}</span>}
+          {monthlySaving != null && monthlySaving > 0.004 && <span className="price-diff">{t.saveBadge(inr(monthlySaving))}</span>}
         </div>
       </div>
       <Formulation p={p} />
-      {p.pack_quantity != null && <p className="med-pack">{t.pack(p.pack_quantity)}{variant === "alternative" && reviewed ? ` · ${note}` : ""}</p>}
+      {variant === "alternative" && reviewed && <p className="med-pack">{note}</p>}
       <PriceProvenance product={p} />
       {variant === "alternative" && (
         <>
