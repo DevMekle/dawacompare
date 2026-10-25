@@ -669,3 +669,5 @@ details[open] .chev { transform: rotate(180deg); }
   .print-only { display: block !important; }
 }
 .btn-primary.btn-wa { color: var(--on-primary); }
+.price-pack { font-size: 13px; color: var(--muted); }
+.med-current .price-pack { color: var(--on-teal-muted); }

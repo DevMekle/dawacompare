@@ -5,7 +5,8 @@ import { useI18n } from "../i18n";
 import { inr, fmtDate } from "../lib/format";
 import { Chip } from "./ui";
 
-function QuoteRow({ label, q }: { label: string; q: PriceQuote | null }) {
+/** showsOnCard: the card already prints this price (per tablet, with the pack price), so the row shows only where it came from. */
+function QuoteRow({ label, q, showsOnCard = false }: { label: string; q: PriceQuote | null; showsOnCard?: boolean }) {
   const { t, lang } = useI18n();
   if (!q) {
     return (
@@ -22,12 +23,12 @@ function QuoteRow({ label, q }: { label: string; q: PriceQuote | null }) {
       <span className="pq-label">{label}</span>
       {q.freshness === "unverified" ? (
         <span className="pq-amt is-na">{t.noVerifiedPrice}</span>
-      ) : (
+      ) : q.freshness === "stale" || !showsOnCard ? (
         <span className="pq-amt">
           <span className="pq-num">{inr(q.amount, true)}</span>
           <span className="pq-pack"> / {q.pack_quantity}</span>
         </span>
-      )}
+      ) : null}
       {chip}
       <span className="pq-src">
         {t.sources[q.price_source]} · {t.lastVerified}: {q.last_verified_at ? fmtDate(q.last_verified_at, lang) : t.never}
@@ -42,7 +43,7 @@ export function PriceProvenance({ product }: { product: ComparableProduct }) {
   const { t } = useI18n();
   return (
     <div className="prov">
-      <QuoteRow label={t.priceTypes.MRP} q={product.mrp} />
+      <QuoteRow label={t.priceTypes.MRP} q={product.mrp} showsOnCard />
       {product.actual_selling_price && <QuoteRow label={t.priceTypes.SELLING_PRICE} q={product.actual_selling_price} />}
     </div>
   );

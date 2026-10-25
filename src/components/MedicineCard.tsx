@@ -45,6 +45,7 @@ export function MedicineCard({ product: p, variant, selected, onSelect, perTabSa
         <div className="price">
           <span className={`price-big ${unit == null ? "is-na" : ""}`}>{unit == null ? "—" : inr(unit, true)}</span>
           <span className="price-unit">{t.perTab} · {t.priceTypes.MRP}</span>
+          {p.mrp && unit != null && <span className="price-pack">{t.packPrice(inr(p.mrp.amount, true), p.mrp.pack_quantity)}</span>}
           {perTabSaving != null && perTabSaving > 0.004 && <span className="price-diff">{t.saveBadge(inr(perTabSaving, true))}</span>}
         </div>
       </div>
