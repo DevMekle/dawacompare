@@ -2,7 +2,7 @@
 
 A mobile-first React + TypeScript prototype for Indian households that buy the same prescription medicines every month. A user photographs a medicine strip, confirms what it is, sees reviewed alternatives with the same formulation, and gets a savings estimate to discuss with their doctor or pharmacist.
 
-The live catalogue is **real data** in PostgreSQL: 51 Indian brands (MRP from public online pharmacy listings) and 22 **Jan Aushadhi** generics (drug code, unit size and MRP from the government PMBJP product list), every price dated. Fictional sample data is used only in **demo mode** (`?demo`, the Claude artifact or a local file) to show every safety state. Photo reading uses the **real OpenAI Vision API** when the app is deployed on Vercel with an `OPENAI_API_KEY`; everywhere else it falls back to manual name entry or a clearly labelled simulated reading.
+The live catalogue is **real data** in PostgreSQL: 101 Indian brands (MRP from public online pharmacy listings) and 48 **Jan Aushadhi** generics (149 medicines) (drug code, unit size and MRP from the government PMBJP product list), every price dated. Fictional sample data is used only in **demo mode** (`?demo`, the Claude artifact or a local file) to show every safety state. Photo reading uses the **real OpenAI Vision API** when the app is deployed on Vercel with an `OPENAI_API_KEY`; everywhere else it falls back to manual name entry or a clearly labelled simulated reading.
 
 ## Run it
 

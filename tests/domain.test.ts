@@ -101,6 +101,17 @@ test("real data: other brands and Jan Aushadhi generics are both alternatives", 
   // levothyroxine: Jan Aushadhi row is not approved
   assert.ok(!findEligibleAlternatives(byId("real_thyronorm_50"), ALL_MEDICINES).eligible.some((m) => m.medicine_id === "ja_1221"));
 });
+test("expanded catalogue: common chronic medicines get branded and Jan Aushadhi options", () => {
+  const REAL = ALL_MEDICINES.filter((m) => isRealRecord(m.medicine_id));
+  const alts = (id: string) => findEligibleAlternatives(byId(id), REAL).eligible.map((m) => m.medicine_id).sort();
+  assert.deepEqual(alts("real_januvia_100"), ["real_istavel_100"]);
+  assert.deepEqual(alts("real_telma_h"), ["ja_298", "real_telmikind_h"]);
+  assert.ok(alts("real_montair_lc").includes("ja_252") && alts("real_montair_lc").includes("real_montek_lc"));
+  assert.ok(alts("real_shelcal_500").includes("real_cipcal_500"));
+  // recognised but never offered: tablet type not stated on the listing
+  assert.ok(!alts("real_glycomet_gp_2").includes("real_gemer_2"));
+  assert.ok(!REAL.some((m) => alts(m.medicine_id).includes("real_razo_20")));
+});
 test("real prices carry their source and date", () => {
   assert.equal(product("real_okacet_10").mrp?.last_verified_at, "2026-10-24");
   assert.equal(product("real_okacet_10").mrp?.price_source, "public_listing");
