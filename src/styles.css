@@ -671,3 +671,18 @@ details[open] .chev { transform: rotate(180deg); }
 .btn-primary.btn-wa { color: var(--on-primary); }
 .price-pack { font-size: 13px; color: var(--muted); }
 .med-current .price-pack { color: var(--on-teal-muted); }
+
+/* Home: call to action, trust lines and the live example */
+.hero-cta { margin-top: 18px; width: auto; display: inline-flex; padding-left: 22px; padding-right: 22px; }
+.hero-trust { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; color: var(--ink); }
+.hero-trust li { display: flex; align-items: center; gap: 8px; }
+.hero-trust svg { color: var(--mint-ink); flex: none; }
+.check-area { scroll-margin-top: 80px; height: 0; }
+.example-card { display: flex; flex-direction: column; gap: 10px; }
+.example-kicker { margin: 0; font-size: 12.5px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.example-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.example-row > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.example-price { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.example-alt .example-price { color: var(--mint-ink); }
+.example-save { margin: 0; display: flex; align-items: center; gap: 8px; font-weight: 650; color: var(--mint-ink); }
+.example-note { margin: 0; }

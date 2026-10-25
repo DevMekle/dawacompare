@@ -7,7 +7,47 @@ import { ActionBar, Notice, Spinner } from "../components/ui";
 import { UploadPanel, Photo } from "../components/UploadPanel";
 import { ManualSearch } from "../components/ManualSearch";
 import { SavedMed } from "../lib/savedMeds";
-import { inr } from "../lib/format";
+import { inr, fmtDate } from "../lib/format";
+import { api } from "../api/client";
+import { calculateSavings } from "../domain/pricing";
+import { ComparableProduct } from "../domain/types";
+
+const { useState, useEffect } = React;
+
+// Example shown before the customer adds a medicine. Numbers come live from the catalogue;
+// if either price is out of date or the alternative is missing, the card is not shown.
+const EXAMPLE = { current: "real_telma_40", alternative: "ja_300" };
+
+function ExampleCard() {
+  const { t, lang } = useI18n();
+  const [ex, setEx] = useState<{ cur: ComparableProduct; alt: ComparableProduct; saving: number } | null>(null);
+  useEffect(() => {
+    let live = true;
+    api.getComparison(EXAMPLE.current).then((c) => {
+      const alt = c.alternatives.find((a) => a.medicine_id === EXAMPLE.alternative);
+      if (!alt || c.current.mrp?.freshness !== "current" || alt.mrp?.freshness !== "current") return;
+      const o = calculateSavings(c.current, alt, "MRP", 1);
+      if (live && o.ok && o.monthlySaving > 0) setEx({ cur: c.current, alt, saving: o.monthlySaving });
+    }, () => {});
+    return () => { live = false; };
+  }, []);
+  if (!ex) return null;
+  return (
+    <div className="card example-card" aria-label={t.exKicker}>
+      <p className="example-kicker">{t.exKicker}</p>
+      <div className="example-row">
+        <div><strong>{ex.cur.brand_name}</strong><span className="muted small">{ex.cur.active_ingredients.join(" + ")} {ex.cur.strength}</span></div>
+        <span className="example-price">{t.exPerTab(inr(ex.cur.mrp!.per_unit!, true))}</span>
+      </div>
+      <div className="example-row example-alt">
+        <div><strong>{ex.alt.brand_name}</strong><span className="muted small">{t.jaBadge}</span></div>
+        <span className="example-price">{t.exPerTab(inr(ex.alt.mrp!.per_unit!, true))}</span>
+      </div>
+      <p className="example-save"><Icon name="circleCheck" size={18} />{t.exSave(inr(ex.saving))}</p>
+      <p className="muted small example-note">{t.exNote(ex.alt.price_source ? t.sources[ex.alt.price_source] : "", fmtDate(ex.alt.mrp!.last_verified_at!, lang))}</p>
+    </div>
+  );
+}
 
 export type Phase = "reading" | "catalogue" | "verifying";
 const PHASES: Phase[] = ["reading", "catalogue", "verifying"];
@@ -65,14 +105,23 @@ export function HomeScreen(p: Props) {
         <p className="eyebrow">{t.s1Eyebrow}</p>
         <h1 ref={p.headRef} tabIndex={-1} className="hero-title">{t.s1Title}</h1>
         <p className="lede">{t.s1Body}</p>
+        <button type="button" className="btn btn-primary hero-cta" onClick={() => document.getElementById("check-area")?.scrollIntoView?.({ behavior: "smooth", block: "start" })}>
+          {t.checkCta}<Icon name="arrowRight" size={18} />
+        </button>
+        <ul className="hero-trust">
+          <li><Icon name="shieldCheck" size={16} />{t.trustSource}</li>
+          <li><Icon name="ban" size={16} />{t.trustNoSell}</li>
+        </ul>
         <ul className="hero-points">
           <li><Icon name="check" size={16} />{t.noSignup}</li>
-          <li><Icon name="check" size={16} />{t.sameFormulation}</li>
           {p.coverage != null && p.coverage > 0 && <li><Icon name="database" size={16} />{t.coverage(p.coverage)}</li>}
           {p.checks != null && p.checks > 0 && <li><Icon name="listChecks" size={16} />{t.checksSoFar(p.checks)}</li>}
         </ul>
       </div>
 
+      {!p.photo && !busy && <ExampleCard />}
+
+      <div id="check-area" className="check-area" />
       {busy ? (
         <div className="pipeline" role="status" aria-live="polite">
           {p.photo && <img src={p.photo.url} alt="" className="pipeline-thumb" />}
