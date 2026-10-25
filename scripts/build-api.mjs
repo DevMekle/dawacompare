@@ -2,7 +2,7 @@
 // Vercel then runs api/*.js as-is: no TypeScript compile step and no runtime import resolution.
 import { build } from "esbuild";
 
-for (const name of ["catalogue", "identify", "feedback"]) {
+for (const name of ["catalogue", "identify", "feedback", "account"]) {
   await build({
     entryPoints: [`functions/${name}.ts`],
     outfile: `api/${name}.js`,
@@ -16,4 +16,4 @@ for (const name of ["catalogue", "identify", "feedback"]) {
     logLevel: "warning",
   });
 }
-console.log("api/catalogue.js, api/identify.js, api/feedback.js bundled");
+console.log("api/catalogue.js, api/identify.js, api/feedback.js, api/account.js bundled");

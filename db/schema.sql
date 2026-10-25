@@ -58,3 +58,51 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE INDEX IF NOT EXISTS events_name_idx ON events (name, created_at);
+
+-- ---------------------------------------------------------------------------
+-- Accounts (phone number + OTP) and the Plus subscription.
+-- Personal data kept: the phone number, consent time, family profile names and saved medicines.
+-- Deleting a user removes everything below (ON DELETE CASCADE).
+CREATE TABLE IF NOT EXISTS users (
+  id             bigserial PRIMARY KEY,
+  phone          text NOT NULL UNIQUE CHECK (phone ~ '^\+91[6-9][0-9]{9}$'),
+  consent_at     timestamptz NOT NULL,
+  plan           text NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'plus')),
+  plan_until     timestamptz,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  last_login_at  timestamptz
+);
+
+-- One pending code per phone number; only a hash of the code is stored.
+CREATE TABLE IF NOT EXISTS otp_codes (
+  phone       text PRIMARY KEY,
+  code_hash   text NOT NULL,
+  expires_at  timestamptz NOT NULL,
+  attempts    integer NOT NULL DEFAULT 0,
+  sent_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS profiles (
+  id          bigserial PRIMARY KEY,
+  user_id     bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  name        text NOT NULL CHECK (length(name) BETWEEN 1 AND 40),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS profiles_user_idx ON profiles (user_id);
+
+-- Plus: medicines saved to the account (synced across devices), with refill reminders and the
+-- cheapest per-tablet price seen at save time (used for price-drop alerts).
+CREATE TABLE IF NOT EXISTS saved_medicines (
+  id                 bigserial PRIMARY KEY,
+  user_id            bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  profile_id         bigint NOT NULL REFERENCES profiles (id) ON DELETE CASCADE,
+  key                text NOT NULL,
+  data               jsonb NOT NULL,
+  best_unit_price    numeric(10, 4),
+  refill_every_days  integer CHECK (refill_every_days IS NULL OR refill_every_days BETWEEN 7 AND 180),
+  next_refill        date,
+  reminded_for       date,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (profile_id, key)
+);
+CREATE INDEX IF NOT EXISTS saved_medicines_user_idx ON saved_medicines (user_id);

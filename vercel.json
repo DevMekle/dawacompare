@@ -1,5 +1,11 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "framework": null
+  "framework": null,
+  "crons": [
+    {
+      "path": "/api/account?action=cron",
+      "schedule": "30 3 * * *"
+    }
+  ]
 }
