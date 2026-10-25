@@ -74,7 +74,6 @@ export function HomeScreen(p: Props) {
         <ul className="trust-points">
           <li><Icon name="clock" size={16} />{t.trustSource}</li>
           <li><Icon name="shieldCheck" size={16} />{t.trustNoSell}</li>
-          <li><Icon name="info" size={16} />{t.trustDoctor}</li>
         </ul>
         <ul className="hero-points">
           <li><Icon name="check" size={16} />{t.noSignup}</li>
