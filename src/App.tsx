@@ -22,7 +22,7 @@ declare global {
   interface Window { claude?: { use(name: string): Promise<any> } }
 }
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 const MAX_BYTES = 15 * 1024 * 1024;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -67,7 +67,7 @@ export function App() {
   const [compState, setCompState] = useState<"loading" | "error" | "ready">("loading");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sort, setSort] = useState<"price" | "name">("price");
-  const [unitsPerDay, setUnitsPerDay] = useState<number | null>(1);
+  const [unitsPerDay, setUnitsPerDay] = useState<number | null>(null);
   const [basis, setBasis] = useState<PriceType>("MRP");
   const [packInfo, setPackInfo] = useState<{ f: Formulation; mrp: number; pack: number; brand: string } | null>(null);
   const [saved, setSaved] = useState<SavedMed[]>(loadSaved);
@@ -105,9 +105,8 @@ export function App() {
   }, [step]);
 
   // ---- downstream resets: changing an earlier answer clears what depended on it
-  const clearFromComparison = () => { setConfirmed(null); setComparison(null); setSelectedId(null); setUnitsPerDay(1); setBasis("MRP"); };
-  /** The cheapest alternative with a current price, preselected so the saving shows straight away. */
-  const cheapestId = (alts: ComparableProduct[]) => alts.filter((a) => a.mrp?.freshness === "current" && a.mrp.per_unit != null).sort((a, b) => a.mrp!.per_unit! - b.mrp!.per_unit!)[0]?.medicine_id ?? null;
+  // Nothing is preselected: the customer chooses the alternative and enters tablets a day.
+  const clearFromComparison = () => { setConfirmed(null); setComparison(null); setSelectedId(null); setUnitsPerDay(null); setBasis("MRP"); };
 
   const applyVerification = (src: "photo" | "manual" | "name", ex: Extraction, v: VerificationResult) => {
     setSource(src);
@@ -172,12 +171,7 @@ export function App() {
       const v = await api.verify(ex);
       setMaker(m.manufacturer);
       applyVerification("manual", ex, v);
-      if (v.status === "matched" && v.record) {
-        // Picked from the catalogue: it already is a verified record, so go straight to savings.
-        setConfirmed({ record: v.record, how: "manual" });
-        loadComparison(v.record.medicine_id);
-        setStep(3);
-      } else setStep(2);
+      setStep(2);
     } catch {
       setIdentifyError(t.identifyErr);
     } finally {
@@ -211,7 +205,6 @@ export function App() {
     try {
       const c = await api.getComparison(id);
       setComparison(c);
-      setSelectedId(cheapestId(c.alternatives));
       setCompState("ready");
       track("comparison_viewed", { medicine: c.current.brand_name, alternatives: c.alternatives.length });
     } catch {
@@ -236,7 +229,6 @@ export function App() {
     try {
       const r = await api.getFormulationComparison(f);
       setComparison({ current: currentP, ...r });
-      setSelectedId(cheapestId(r.alternatives));
       setCompState("ready");
       track("comparison_viewed", { medicine: "pack:" + f.active_ingredients.join("+") + " " + f.strength, alternatives: r.alternatives.length });
     } catch {
@@ -283,7 +275,8 @@ export function App() {
   const canVisit = (s: Step): boolean =>
     s === 1 ? phase == null
     : s === 2 ? !!result && phase == null
-    : !!confirmed;
+    : s === 3 ? !!confirmed
+    : !!confirmed && !!alt;
 
   const back = () => step > 1 && setStep((step - 1) as Step);
 
@@ -303,7 +296,7 @@ export function App() {
         onCompareByPack={compareByPack}
       />
     );
-  } else if (step === 3 && confirmed) {
+  } else if ((step === 3 || step === 4) && confirmed) {
     const units = outcome?.ok ? unitsPerDay : null;
     const summary = current && alt && comparison && outcome && units ? buildSummary({
       current, alternatives: comparison.alternatives, selectedId, basis: effBasis,
@@ -330,10 +323,11 @@ export function App() {
     };
     screen = (
       <ResultScreen
+        mode={step === 4 && alt ? "savings" : "compare"} onNext={() => { setStep(4); track("savings_viewed"); }}
         headRef={headRef} state={compState} data={comparison}
         onRetry={() => (confirmed.record.medicine_id === "user_pack" && packInfo ? compareByPack(packInfo.f, packInfo.mrp, packInfo.pack, packInfo.brand) : loadComparison(confirmed.record.medicine_id))}
         onNew={reset}
-        selectedId={selectedId} onSelect={(id) => { setSelectedId(id); track("savings_viewed"); }} sort={sort} setSort={setSort}
+        selectedId={selectedId} onSelect={setSelectedId} sort={sort} setSort={setSort}
         unitsPerDay={unitsPerDay} setUnitsPerDay={setUnitsPerDay}
         basis={effBasis} setBasis={setBasis} bases={bases} outcome={outcome}
         summary={summary} downloader={downloader} canPrint={canPrint}
@@ -405,7 +399,7 @@ export function App() {
               <div className="progress">
                 <button type="button" className="back" onClick={back}><Icon name="arrowLeft" size={18} />{t.back}</button>
                 <span className="progress-label">{t.step(shownStep)} · {t.steps[shownStep - 1]}</span>
-                <div className="progress-bar" aria-hidden="true">{[1, 2, 3].map((n) => <span key={n} className={n <= shownStep ? "on" : ""} />)}</div>
+                <div className="progress-bar" aria-hidden="true">{[1, 2, 3, 4].map((n) => <span key={n} className={n <= shownStep ? "on" : ""} />)}</div>
               </div>
             )}
             {screen}

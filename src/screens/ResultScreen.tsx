@@ -1,7 +1,7 @@
-// Step 3: alternatives, the saving and the report, on one screen.
-// The cheapest priced alternative is preselected and tablets a day starts at 1, so the
-// answer is visible straight away; both can be changed. The detailed calculation lives
-// in the downloadable / shareable report, not on screen.
+// Steps 3 and 4. "compare": the customer picks an alternative. "savings": the customer
+// enters tablets a day, then sees the saving with share / download / save. Nothing is
+// preselected: both choices stay with the customer. The detailed calculation lives in the
+// downloadable / shareable report, not on screen.
 
 import { useI18n } from "../i18n";
 import { ComparisonResponse, ComparableProduct, PriceType } from "../domain/types";
@@ -26,6 +26,8 @@ const kindOf = (id: string): Exclude<Kind, "all"> => (id.startsWith("ja_") ? "ja
 const DOSES = [0.5, 1, 2, 3];
 
 interface Props {
+  mode: "compare" | "savings";
+  onNext: () => void;
   headRef: any;
   state: "loading" | "error" | "ready";
   data: ComparisonResponse | null;
@@ -111,7 +113,7 @@ export function ResultScreen(p: Props) {
   const [busy, setBusy] = useState(false);
   const docRef = useRef<HTMLDivElement>(null);
 
-  const head = <h1 ref={p.headRef} tabIndex={-1} className="visually-hidden">{t.s3Title}</h1>;
+  const head = <h1 ref={p.headRef} tabIndex={-1} className="visually-hidden">{p.mode === "compare" ? t.s3Title : t.s4Title}</h1>;
   if (p.state !== "ready" || !p.data) {
     return (
       <section className="screen">
@@ -133,10 +135,9 @@ export function ResultScreen(p: Props) {
 
   const { current, alternatives, excluded } = p.data;
   const units = p.unitsPerDay ?? 0;
-  const monthlySaving = (a: ComparableProduct) => {
-    if (!units) return null;
-    const o = calculateSavings(current, a, "MRP", units);
-    return o.ok ? o.monthlySaving : null;
+  const perTabSaving = (a: ComparableProduct) => {
+    const o = calculateSavings(current, a, "MRP", 1);
+    return o.ok ? o.current.per_unit - o.alternative.per_unit : null;
   };
   const unit = (x: ComparableProduct) => x.mrp?.per_unit ?? Infinity;
   const nBrand = alternatives.filter((a) => kindOf(a.medicine_id) === "brand").length;
@@ -171,6 +172,57 @@ export function ResultScreen(p: Props) {
   };
   const ready = !!alt && !!p.summary && !!p.outcome && !!units;
 
+  if (p.mode === "savings" && alt) {
+    return (
+      <section className="screen">
+        {head}
+        <p className="pair"><span className="muted">{t.comparing}</span> <strong>{current.brand_name}</strong> <Icon name="arrowRight" size={14} /> <strong>{alt.brand_name}</strong></p>
+        <div className="card dose-card">
+          <span className="field-label" id="qty-label">{t.calcTitle}</span>
+          <Segmented<number | "other">
+            id="qty" label={t.calcTitle}
+            value={other ? "other" : p.unitsPerDay}
+            options={[...DOSES.map((d) => ({ value: d as number | "other", label: d === 0.5 ? "½" : String(d) })), { value: "other" as const, label: t.other }]}
+            onChange={(v) => { if (v === "other") { setOther(true); p.setUnitsPerDay(null); } else { setOther(false); p.setUnitsPerDay(v); } }}
+          />
+          {other && (
+            <input id="qty-other" className="input" type="number" inputMode="decimal" min={0.25} max={20} step="any" aria-labelledby="qty-label" placeholder={t.otherQtyHint}
+              value={p.unitsPerDay ?? ""} onChange={(e: any) => { const n = parseFloat(e.target.value); p.setUnitsPerDay(Number.isFinite(n) && n > 0 && n <= 20 ? n : null); }} />
+          )}
+          <p className="field-hint"><Icon name="stethoscope" size={14} />{t.calcHelp}</p>
+          {p.bases.length > 1 && (
+            <Segmented<PriceType> label={t.basisTitle} value={p.basis} onChange={p.setBasis}
+              options={(["MRP", "SELLING_PRICE"] as PriceType[]).map((b) => ({ value: b, label: t.priceTypes[b] }))} />
+          )}
+        </div>
+
+        {p.outcome && units > 0 ? <SavingCard outcome={p.outcome} alt={alt} units={units} /> : <div className="qty-prompt"><Icon name="info" size={18} />{t.enterQty}</div>}
+
+        <Notice tone="warn" icon="stethoscope"><strong>{t.caution}</strong></Notice>
+        {msg && <Notice tone={msg.ok ? "ok" : "warn"} icon={msg.ok ? "circleCheck" : "alert"} role="status">{msg.text}</Notice>}
+        {ready && (
+          <div className="secondary-row">
+            {p.downloader.kind !== "none" && <button type="button" className="btn btn-quiet" onClick={download} disabled={busy}><Icon name="download" size={16} />{busy ? t.downloading : t.downloadReport}</button>}
+            <button type="button" className="btn btn-quiet" onClick={copy}><Icon name="copy" size={16} />{t.copy}</button>
+            <button type="button" className="btn btn-quiet" onClick={p.onSave} disabled={p.isSaved} aria-pressed={p.isSaved}><Icon name={p.isSaved ? "check" : "plus"} size={16} />{p.isSaved ? t.savedMed : t.saveMed}</button>
+            {p.canPrint && <button type="button" className="btn btn-quiet" onClick={() => window.print()}><Icon name="printer" size={16} />{t.print}</button>}
+            <button type="button" className="btn btn-quiet" onClick={p.onNew}><Icon name="rotate" size={16} />{t.newComparison}</button>
+          </div>
+        )}
+        {ready && <div className="print-only"><SummaryDocument s={p.summary!} docRef={docRef} /></div>}
+        {ready && !DEMO && <FeedbackBox context={p.feedbackContext} />}
+
+        <ActionBar hint={!units ? <p className="bar-hint">{t.enterQty}</p> : null}>
+          {ready ? (
+            <a className="btn btn-primary btn-wa" href={`https://wa.me/?text=${encodeURIComponent(p.shareText)}`} target="_blank" rel="noopener noreferrer" onClick={p.onShared}><Icon name="arrowRight" size={20} />{t.shareWhatsApp}</a>
+          ) : (
+            <button type="button" className="btn btn-primary is-blocked" aria-disabled="true"><Icon name="arrowRight" size={20} />{t.shareWhatsApp}</button>
+          )}
+        </ActionBar>
+      </section>
+    );
+  }
+
   return (
     <section className="screen">
       {head}
@@ -190,28 +242,6 @@ export function ResultScreen(p: Props) {
         </>
       ) : (
         <>
-          <div className="card dose-card">
-            <span className="field-label" id="qty-label">{t.calcTitle}</span>
-            <Segmented<number | "other">
-              id="qty" label={t.calcTitle}
-              value={other ? "other" : p.unitsPerDay}
-              options={[...DOSES.map((d) => ({ value: d as number | "other", label: d === 0.5 ? "½" : String(d) })), { value: "other" as const, label: t.other }]}
-              onChange={(v) => { if (v === "other") { setOther(true); p.setUnitsPerDay(null); } else { setOther(false); p.setUnitsPerDay(v); } }}
-            />
-            {other && (
-              <input id="qty-other" className="input" type="number" inputMode="decimal" min={0.25} max={20} step="any" aria-labelledby="qty-label" placeholder={t.otherQtyHint}
-                value={p.unitsPerDay ?? ""} onChange={(e: any) => { const n = parseFloat(e.target.value); p.setUnitsPerDay(Number.isFinite(n) && n > 0 && n <= 20 ? n : null); }} />
-            )}
-            <p className="field-hint"><Icon name="stethoscope" size={14} />{t.calcHelp}</p>
-            {p.bases.length > 1 && (
-              <Segmented<PriceType> label={t.basisTitle} value={p.basis} onChange={p.setBasis}
-                options={(["MRP", "SELLING_PRICE"] as PriceType[]).map((b) => ({ value: b, label: t.priceTypes[b] }))} />
-            )}
-          </div>
-
-          {alt && p.outcome && units > 0 && <SavingCard outcome={p.outcome} alt={alt} units={units} />}
-          {!units && <div className="qty-prompt"><Icon name="info" size={18} />{t.enterQty}</div>}
-
           <div className="list-head">
             <h2 className="list-title">{t.optionsCount(alternatives.length)}</h2>
             <div className="sort">
@@ -231,7 +261,7 @@ export function ResultScreen(p: Props) {
           )}
           <div className="alts" role="radiogroup" aria-label={t.s3Title}>
             {sorted.map((a) => (
-              <MedicineCard key={a.medicine_id} product={a} variant="alternative" selected={p.selectedId === a.medicine_id} onSelect={() => p.onSelect(a.medicine_id)} monthlySaving={monthlySaving(a)} />
+              <MedicineCard key={a.medicine_id} product={a} variant="alternative" selected={p.selectedId === a.medicine_id} onSelect={() => p.onSelect(a.medicine_id)} perTabSaving={perTabSaving(a)} />
             ))}
           </div>
 
@@ -245,27 +275,10 @@ export function ResultScreen(p: Props) {
 
           <Notice tone="info" icon="info">{DEMO ? t.sampleNote : t.realNote}</Notice>
           {p.catalogue && <p className="cat-src muted small"><Icon name="database" size={14} />{t.catalogueFrom(p.catalogue.source, p.catalogue.medicines)}</p>}
-          <Notice tone="warn" icon="stethoscope"><strong>{t.caution}</strong></Notice>
-
-          {msg && <Notice tone={msg.ok ? "ok" : "warn"} icon={msg.ok ? "circleCheck" : "alert"} role="status">{msg.text}</Notice>}
-          {ready && (
-            <div className="secondary-row">
-              {p.downloader.kind !== "none" && <button type="button" className="btn btn-quiet" onClick={download} disabled={busy}><Icon name="download" size={16} />{busy ? t.downloading : t.downloadReport}</button>}
-              <button type="button" className="btn btn-quiet" onClick={copy}><Icon name="copy" size={16} />{t.copy}</button>
-              <button type="button" className="btn btn-quiet" onClick={p.onSave} disabled={p.isSaved} aria-pressed={p.isSaved}><Icon name={p.isSaved ? "check" : "plus"} size={16} />{p.isSaved ? t.savedMed : t.saveMed}</button>
-              {p.canPrint && <button type="button" className="btn btn-quiet" onClick={() => window.print()}><Icon name="printer" size={16} />{t.print}</button>}
-              <button type="button" className="btn btn-quiet" onClick={p.onNew}><Icon name="rotate" size={16} />{t.newComparison}</button>
-            </div>
-          )}
-          {ready && <div className="print-only"><SummaryDocument s={p.summary!} docRef={docRef} /></div>}
-          {ready && !DEMO && <FeedbackBox context={p.feedbackContext} />}
-
-          <ActionBar hint={!alt ? <p className="bar-hint">{t.selectHint}</p> : !units ? <p className="bar-hint">{t.enterQty}</p> : null}>
-            {ready ? (
-              <a className="btn btn-primary btn-wa" href={`https://wa.me/?text=${encodeURIComponent(p.shareText)}`} target="_blank" rel="noopener noreferrer" onClick={p.onShared}><Icon name="arrowRight" size={20} />{t.shareWhatsApp}</a>
-            ) : (
-              <button type="button" className="btn btn-primary is-blocked" aria-disabled="true"><Icon name="arrowRight" size={20} />{t.shareWhatsApp}</button>
-            )}
+          <ActionBar hint={!alt ? <p className="bar-hint">{t.selectHint}</p> : null}>
+            <button type="button" className={`btn btn-primary ${alt ? "" : "is-blocked"}`} aria-disabled={!alt} onClick={() => alt && p.onNext()}>
+              {t.seeSavings}<Icon name="arrowRight" size={18} />
+            </button>
           </ActionBar>
         </>
       )}

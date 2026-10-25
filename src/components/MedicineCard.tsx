@@ -20,11 +20,11 @@ interface Props {
   variant: "current" | "alternative";
   selected?: boolean;
   onSelect?: () => void;
-  /** Monthly saving against the customer's medicine at the chosen tablets a day, when it can be worked out. */
-  monthlySaving?: number | null;
+  /** How much less this costs per tablet than the customer's medicine, when it can be worked out. */
+  perTabSaving?: number | null;
 }
 
-export function MedicineCard({ product: p, variant, selected, onSelect, monthlySaving }: Props) {
+export function MedicineCard({ product: p, variant, selected, onSelect, perTabSaving }: Props) {
   const { t } = useI18n();
   const unit = p.mrp?.per_unit ?? null;
   const priced = p.mrp?.freshness === "current";
@@ -45,7 +45,7 @@ export function MedicineCard({ product: p, variant, selected, onSelect, monthlyS
         <div className="price">
           <span className={`price-big ${unit == null ? "is-na" : ""}`}>{unit == null ? "—" : inr(unit, true)}</span>
           <span className="price-unit">{t.perTab} · {t.priceTypes.MRP}</span>
-          {monthlySaving != null && monthlySaving > 0.004 && <span className="price-diff">{t.saveBadge(inr(monthlySaving))}</span>}
+          {perTabSaving != null && perTabSaving > 0.004 && <span className="price-diff">{t.saveBadge(inr(perTabSaving, true))}</span>}
         </div>
       </div>
       <Formulation p={p} />
