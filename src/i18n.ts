@@ -45,8 +45,9 @@ const en = {
   s1Title: "Your medicines may cost less.",
   s1Body: "See which medicines match yours exactly, what each costs per tablet, and what to ask your doctor or pharmacist.",
   // ---- accounts & Plus
-  liTitle: "Sign in to DawaCompare",
-  liBody: "Use your mobile number. We'll send you a 6-digit code.",
+  liTitle: "Sign in or sign up to compare",
+  liBody: "Use your mobile number. We'll send you a 6-digit code. New here? Your account is created when you verify.",
+  liSignIn: "Sign in",
   liPhone: "Mobile number",
   liConsent: "I agree that DawaCompare stores my mobile number and the medicines I save, to run my account. I can delete my account at any time.",
   liSend: "Send code",
@@ -481,8 +482,9 @@ const hi: Strings = {
   s1Title: "आपकी दवाएँ कम दाम में मिल सकती हैं।",
   s1Body: "देखें कौन-सी दवाएँ आपकी दवा से बिल्कुल मेल खाती हैं, हर एक की प्रति गोली क़ीमत क्या है, और डॉक्टर या फ़ार्मासिस्ट से क्या पूछें।",
   // ---- accounts & Plus
-  liTitle: "DawaCompare में साइन इन करें",
-  liBody: "अपना मोबाइल नंबर डालें। हम 6 अंकों का कोड भेजेंगे।",
+  liTitle: "तुलना के लिए साइन इन या साइन अप करें",
+  liBody: "अपना मोबाइल नंबर डालें। हम 6 अंकों का कोड भेजेंगे। नए हैं? कोड जाँचते ही आपका अकाउंट बन जाएगा।",
+  liSignIn: "साइन इन",
   liPhone: "मोबाइल नंबर",
   liConsent: "मैं सहमत हूँ कि DawaCompare मेरा मोबाइल नंबर और मेरी सेव की गई दवाएँ मेरा अकाउंट चलाने के लिए रखे। मैं कभी भी अपना अकाउंट डिलीट कर सकता/सकती हूँ।",
   liSend: "कोड भेजें",

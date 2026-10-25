@@ -8,7 +8,7 @@ import { Notice, Spinner } from "../components/ui";
 
 const { useState, useEffect, useRef } = React;
 
-export function LoginScreen({ headRef, onSignedIn }: { headRef: any; onSignedIn: (u: Me) => void }) {
+export function LoginScreen({ headRef, onSignedIn, onCancel }: { headRef: any; onSignedIn: (u: Me) => void; onCancel: () => void }) {
   const { t } = useI18n();
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
@@ -64,6 +64,7 @@ export function LoginScreen({ headRef, onSignedIn }: { headRef: any; onSignedIn:
 
   return (
     <section className="screen login">
+      <button type="button" className="back" onClick={onCancel}><Icon name="arrowLeft" size={18} />{t.acBack}</button>
       <div className="card login-card">
         <span className="login-icon"><Icon name="smartphone" size={26} /></span>
         {stage === "phone" ? (

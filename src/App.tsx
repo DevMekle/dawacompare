@@ -84,6 +84,10 @@ export function App() {
   const [cloud, setCloud] = useState<CloudSaved[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [view, setView] = useState<"app" | "account" | "plans">("app");
+  // Sign-in is asked for only when a comparison starts; the action then continues after sign-in.
+  const [pending, setPending] = useState<null | { run: () => void }>(null);
+  const needLogin = LIVE && auth === "out";
+  const guard = (run: () => void) => { if (needLogin) setPending({ run }); else run(); };
   const [checks, setChecks] = useState<number | null>(null);
 
   const [downloader, setDownloader] = useState<Downloader>(() => (window.claude?.use ? { kind: "pending" } : { kind: "native" }));
@@ -379,8 +383,9 @@ export function App() {
     screen = (
       <HomeScreen
         headRef={headRef} pickerRef={pickerRef} photo={photo} fileError={fileError} onFile={onFile} onRemove={onRemove}
-        scenario={scenario} setScenario={setScenario} onSample={onSample} phase={phase} identifyError={identifyError} onIdentify={identify} aiName={aiName}
-        manualOpen={manualOpen} setManualOpen={setManualOpen} onManualPick={onManualPick} onIdentifyName={visionLive ? identifyName : undefined}
+        scenario={scenario} setScenario={setScenario} onSample={onSample} phase={phase} identifyError={identifyError} onIdentify={(live) => guard(() => identify(live))} aiName={aiName}
+        manualOpen={manualOpen} setManualOpen={setManualOpen} onManualPick={(m) => guard(() => onManualPick(m))}
+        onIdentifyName={visionLive ? (n) => (needLogin ? (setPending({ run: () => { identifyName(n).catch(() => setIdentifyError(t.nameFailed)); } }), Promise.resolve()) : identifyName(n)) : undefined}
         demo={DEMO} saved={homeSaved} alerts={plus && alerts.length ? <AlertList alerts={alerts} user={user!} /> : null} onRecheck={recheckSaved} onRemoveSaved={removeSaved} checks={checks} coverage={catalogue?.medicines ?? null}
       />
     );
@@ -391,9 +396,13 @@ export function App() {
         onBack={() => setView("app")} onRecheck={(c) => { setView("app"); recheckSaved(c.data as SavedMed); }} onSignedOut={signOut} />
     );
   }
-  if (auth === "loading") screen = <section className="screen"><p className="muted" role="status"><Spinner /></p></section>;
-  if (auth === "out") screen = <LoginScreen headRef={headRef} onSignedIn={(u) => { setAuth(u); setView("app"); }} />;
-  const gated = auth === "loading" || auth === "out" || (user && view !== "app");
+  if (needLogin && pending) {
+    screen = (
+      <LoginScreen headRef={headRef} onCancel={() => setPending(null)}
+        onSignedIn={(u) => { const next = pending; setAuth(u); setView("app"); setPending(null); setTimeout(() => next.run(), 0); }} />
+    );
+  }
+  const gated = (needLogin && !!pending) || (user && view !== "app");
   const shownStep: Step = screen.type === HomeScreen || gated ? 1 : step;
 
   return (
@@ -406,6 +415,11 @@ export function App() {
               <span className="logo-word">Dawa<span>Compare</span></span>
             </button>
             {DEMO && <span className="proto-pill">{t.demoPill}</span>}
+            {needLogin && !pending && (
+              <button type="button" className="acct-btn" onClick={() => setPending({ run: () => {} })}>
+                <Icon name="user" size={18} /><span className="acct-label">{t.liSignIn}</span>
+              </button>
+            )}
             {user && (
               <button type="button" className={`acct-btn ${plus ? "is-plus" : ""}`} onClick={() => setView(view === "app" ? "account" : "app")} aria-label={t.acOpen}>
                 <Icon name={plus ? "star" : "user"} size={18} /><span className="acct-label">{t.acOpen}</span>
