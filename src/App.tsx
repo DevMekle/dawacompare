@@ -349,7 +349,7 @@ export function App() {
     ].join("\n") : null;
     const siteUrl = DEMO ? "" : location.origin;
     const savedKey = confirmed.record.medicine_id === "user_pack" && packInfo ? `pack:${packInfo.f.active_ingredients.join("+")}:${packInfo.f.strength}:${packInfo.f.release_type}` : confirmed.record.medicine_id;
-    const isSaved = (profileId?: number) => user ? cloud.some((c) => c.key === savedKey && c.profile_id === (profileId ?? user.profiles[0]?.id)) : !LIVE && saved.some((x) => x.key === savedKey);
+    const isSaved = (profileId?: number) => user ? cloud.some((c) => c.key === savedKey && c.profile_id === (profileId ?? user.profiles[0]?.id)) : saved.some((x) => x.key === savedKey);
     const onSave = (profileId?: number) => {
       if (!alt) return;
       setSaveMsg(null);
