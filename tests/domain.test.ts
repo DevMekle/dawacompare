@@ -105,6 +105,8 @@ test("expanded catalogue: common chronic medicines get branded and Jan Aushadhi 
   const REAL = ALL_MEDICINES.filter((m) => isRealRecord(m.medicine_id));
   const alts = (id: string) => findEligibleAlternatives(byId(id), REAL).eligible.map((m) => m.medicine_id).sort();
   assert.deepEqual(alts("real_januvia_100"), ["real_istavel_100"]);
+  // caregiver interview: Pantodac 40 → Pan 40 (and the Jan Aushadhi gastro-resistant generic)
+  assert.deepEqual(alts("real_pantodac_40"), ["ja_212", "real_pan_40"]);
   assert.deepEqual(alts("real_telma_h"), ["ja_298", "real_telmikind_h"]);
   assert.ok(alts("real_montair_lc").includes("ja_252") && alts("real_montair_lc").includes("real_montek_lc"));
   assert.ok(alts("real_shelcal_500").includes("real_cipcal_500"));

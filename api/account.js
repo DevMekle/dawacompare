@@ -5677,6 +5677,9 @@ var BRANDS = [
   ["real_telma_40", "Telma 40", "Glenmark Pharmaceuticals Ltd", ["Telmisartan"], "40 mg", "Tablet", "IR", 108.36, 15],
   ["real_losar_50", "Losar 50", "Torrent Pharmaceuticals Ltd", ["Losartan"], "50 mg", "Tablet", "IR", 178.31, 15],
   ["real_pan_40", "Pan 40", "Alkem Laboratories Ltd", ["Pantoprazole"], "40 mg", "Tablet", "DR", 192.8, 15],
+  // Added 16 Nov 2026 from a caregiver interview (her mother switched from Pantodac 40 to Pan 40).
+  // MRP: Truemeds listing; enteric-coated tablet per Medindia's product listing.
+  ["real_pantodac_40", "Pantodac 40", "Zydus Healthcare Ltd", ["Pantoprazole"], "40 mg", "Tablet", "DR", 247.96, 15],
   ["real_omez_20", "Omez 20", "Dr. Reddy's Laboratories Ltd", ["Omeprazole"], "20 mg", "Capsule", "DR", 61.22, 20],
   ["real_azithral_500", "Azithral 500", "Alembic Pharmaceuticals Ltd", ["Azithromycin"], "500 mg", "Tablet", "IR", 126.73, 5],
   ["real_augmentin_duo_625", "Augmentin Duo 625", "GlaxoSmithKline Pharmaceuticals Ltd", ["Amoxicillin", "Clavulanic Acid"], "500 mg + 125 mg", "Tablet", "IR", 140.88, 6],
