@@ -7,6 +7,7 @@ import type { CatalogueStore } from "../src/catalogue/store";
 import { comparisonWithStore, formulationComparisonWithStore } from "../src/catalogue/service";
 import type { ComparableProduct } from "../src/domain/types";
 import type { SmsSender } from "./sms";
+import { DEMO_LOGIN } from "../src/lib/demoLogin";
 
 export interface Db { query(text: string, params?: unknown[]): Promise<any[]> }
 export interface Deps { db: Db; secret: string; sms: SmsSender | null; store: CatalogueStore; now?: () => Date }
@@ -16,7 +17,10 @@ export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_RESEND_SEC = 30;
 export const SESSION_DAYS = 30;
 export const PLUS_DAYS = 30;
-export const LIMITS = { free: { profiles: 1 }, plus: { profiles: 6, saved: 50 } };
+export const LIMITS = { free: { profiles: 1, saved: 3 }, plus: { profiles: 6, saved: 50 } };
+/** Reviewer demo account (fixed code, no SMS); set DEMO_LOGIN=off to switch it off. */
+export const DEMO_PHONE = `+91${DEMO_LOGIN.phone}`;
+const demoOn = () => (process.env.DEMO_LOGIN ?? "on") !== "off";
 
 export class AccountError extends Error {
   constructor(public code: string, public status = 400) { super(code); }
@@ -64,6 +68,14 @@ export async function requestOtp(d: Deps, phoneInput: unknown): Promise<{ sent: 
   const phone = normalizePhone(phoneInput);
   if (!phone) throw new AccountError("bad_phone");
   const now = nowOf(d);
+  if (phone === DEMO_PHONE && demoOn()) {
+    await d.db.query(
+      `INSERT INTO otp_codes (phone, code_hash, expires_at, attempts, sent_at) VALUES ($1, $2, $3, 0, $4)
+       ON CONFLICT (phone) DO UPDATE SET code_hash = EXCLUDED.code_hash, expires_at = EXCLUDED.expires_at, attempts = 0, sent_at = EXCLUDED.sent_at`,
+      [phone, hashCode(d.secret, phone, DEMO_LOGIN.code), new Date(now.getTime() + OTP_TTL_MIN * 60_000).toISOString(), now.toISOString()],
+    );
+    return { sent: true };
+  }
   const [prev] = await d.db.query("SELECT sent_at FROM otp_codes WHERE phone = $1", [phone]);
   if (prev && now.getTime() - new Date(prev.sent_at).getTime() < OTP_RESEND_SEC * 1000) throw new AccountError("too_soon", 429);
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
@@ -105,7 +117,10 @@ export async function verifyOtp(d: Deps, phoneInput: unknown, codeInput: unknown
   } else {
     await d.db.query("UPDATE users SET last_login_at = $2 WHERE id = $1", [user.id, now.toISOString()]);
   }
-  await d.db.query("DELETE FROM otp_codes WHERE phone = $1", [phone]);
+  if (phone === DEMO_PHONE) {
+    await d.db.query("UPDATE users SET plan = 'plus', plan_until = $2 WHERE id = $1", [user.id, new Date(now.getTime() + PLUS_DAYS * 86400_000).toISOString()]);
+  }
+  if (phone !== DEMO_PHONE) await d.db.query("DELETE FROM otp_codes WHERE phone = $1", [phone]);
   const id = Number(user.id);
   return { token: makeToken(d.secret, id, now), userId: id, created };
 }
@@ -116,7 +131,8 @@ export interface Me {
   plan: "free" | "plus";
   plan_until: string | null;
   profiles: { id: number; name: string }[];
-  limits: { profiles: number };
+  limits: { profiles: number; saved: number };
+  demo: boolean;
 }
 
 async function userRow(d: Deps, uid: number) {
@@ -136,7 +152,8 @@ export async function getMe(d: Deps, uid: number): Promise<Me> {
     plan: plus ? "plus" : "free",
     plan_until: plus ? new Date(u.plan_until).toISOString() : null,
     profiles: profiles.map((p: any) => ({ id: Number(p.id), name: p.name })),
-    limits: { profiles: plus ? LIMITS.plus.profiles : LIMITS.free.profiles },
+    limits: { profiles: plus ? LIMITS.plus.profiles : LIMITS.free.profiles, saved: plus ? LIMITS.plus.saved : LIMITS.free.saved },
+    demo: u.phone === DEMO_PHONE,
   };
 }
 
@@ -162,6 +179,8 @@ export async function cancel(d: Deps, uid: number): Promise<Me> {
 }
 
 export async function deleteAccount(d: Deps, uid: number): Promise<void> {
+  const u = await userRow(d, uid);
+  if (u.phone === DEMO_PHONE) throw new AccountError("demo_account");
   await d.db.query("DELETE FROM users WHERE id = $1", [uid]);
 }
 
@@ -213,12 +232,12 @@ const toSaved = (r: any): SavedRow => ({
 const SAVED_COLS = "id, profile_id, key, data, best_unit_price, refill_every_days, to_char(next_refill, 'YYYY-MM-DD') AS next_refill";
 
 export async function listSaved(d: Deps, uid: number): Promise<SavedRow[]> {
-  await requirePlus(d, uid);
+  await userRow(d, uid);
   return (await d.db.query(`SELECT ${SAVED_COLS} FROM saved_medicines WHERE user_id = $1 ORDER BY created_at DESC`, [uid])).map(toSaved);
 }
 
 export async function saveMedicine(d: Deps, uid: number, b: any): Promise<SavedRow[]> {
-  await requirePlus(d, uid);
+  const plus = isPlus(await userRow(d, uid), nowOf(d));
   const profileId = Number(b?.profile_id);
   const [prof] = await d.db.query("SELECT id FROM profiles WHERE id = $1 AND user_id = $2", [profileId, uid]);
   if (!prof) throw new AccountError("bad_profile");
@@ -226,7 +245,8 @@ export async function saveMedicine(d: Deps, uid: number, b: any): Promise<SavedR
   const data = b?.data && typeof b.data === "object" ? JSON.stringify(b.data) : null;
   if (!key || !data || data.length > 8000) throw new AccountError("bad_request");
   const [{ n }] = await d.db.query("SELECT count(*)::int AS n FROM saved_medicines WHERE user_id = $1", [uid]);
-  if (n >= LIMITS.plus.saved) throw new AccountError("saved_limit");
+  const [exists] = await d.db.query("SELECT 1 FROM saved_medicines WHERE profile_id = $1 AND key = $2", [profileId, key]);
+  if (!exists && n >= (plus ? LIMITS.plus.saved : LIMITS.free.saved)) throw new AccountError(plus ? "saved_limit" : "free_saved_limit", plus ? 400 : 402);
   const best = Number.isFinite(Number(b?.best_unit_price)) && Number(b.best_unit_price) > 0 ? Number(b.best_unit_price) : null;
   await d.db.query(
     `INSERT INTO saved_medicines (user_id, profile_id, key, data, best_unit_price) VALUES ($1, $2, $3, $4::jsonb, $5)
@@ -237,7 +257,7 @@ export async function saveMedicine(d: Deps, uid: number, b: any): Promise<SavedR
 }
 
 export async function removeSaved(d: Deps, uid: number, id: unknown): Promise<SavedRow[]> {
-  await requirePlus(d, uid);
+  await userRow(d, uid);
   await d.db.query("DELETE FROM saved_medicines WHERE id = $1 AND user_id = $2", [Number(id), uid]);
   return listSaved(d, uid);
 }
@@ -274,6 +294,7 @@ const cheapestNow = (alts: ComparableProduct[]) =>
   alts.filter((a) => a.mrp?.freshness === "current" && a.mrp.per_unit != null).sort((a, b) => a.mrp!.per_unit! - b.mrp!.per_unit!)[0] ?? null;
 
 export async function alerts(d: Deps, uid: number): Promise<Alert[]> {
+  await requirePlus(d, uid);
   const saved = await listSaved(d, uid);
   const now = nowOf(d);
   const soon = new Date(now.getTime() + 3 * 86400_000).toISOString().slice(0, 10);

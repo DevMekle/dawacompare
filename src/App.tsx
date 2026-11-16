@@ -85,9 +85,11 @@ export function App() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [view, setView] = useState<"app" | "account" | "plans">("app");
   // Sign-in is asked for only when a comparison starts; the action then continues after sign-in.
-  const [pending, setPending] = useState<null | { run: () => void }>(null);
+  const [pending, setPending] = useState<null | { run: () => void; reason?: "save" }>(null);
   const needLogin = LIVE && auth === "out";
-  const guard = (run: () => void) => { if (needLogin) setPending({ run }); else run(); };
+  // Sign-in is asked for only when saving a medicine; checking and comparing are open to everyone.
+  const saveRef = useRef<((profileId?: number) => void) | null>(null);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [checks, setChecks] = useState<number | null>(null);
 
   const [downloader, setDownloader] = useState<Downloader>(() => (window.claude?.use ? { kind: "pending" } : { kind: "native" }));
@@ -109,9 +111,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!plus) { setCloud([]); setAlerts([]); return; }
+    if (!user) { setCloud([]); setAlerts([]); return; }
     accountApi.saved().then((r) => setCloud(r.saved), () => setCloud([]));
-  }, [plus, user?.phone]);
+  }, [user?.phone, plus]);
   useEffect(() => {
     if (!plus) return;
     accountApi.alerts().then((r) => setAlerts(r.alerts), () => setAlerts([]));
@@ -277,7 +279,7 @@ export function App() {
     const next = saved.filter((x) => x.key !== key); setSaved(next); storeSaved(next);
   };
   /** Plus: medicines come from the account (all devices), labelled with the family member. */
-  const homeSaved: SavedMed[] = plus
+  const homeSaved: SavedMed[] = user
     ? cloud.map((c) => ({ ...(c.data as SavedMed), key: `cloud:${c.id}`, profileName: user!.profiles.find((p) => p.id === c.profile_id)?.name }))
     : saved;
   const signOut = () => { setAuth("out"); setCloud([]); setAlerts([]); setView("app"); reset(); };
@@ -347,22 +349,26 @@ export function App() {
     ].join("\n") : null;
     const siteUrl = DEMO ? "" : location.origin;
     const savedKey = confirmed.record.medicine_id === "user_pack" && packInfo ? `pack:${packInfo.f.active_ingredients.join("+")}:${packInfo.f.strength}:${packInfo.f.release_type}` : confirmed.record.medicine_id;
-    const isSaved = (profileId?: number) => plus ? cloud.some((c) => c.key === savedKey && c.profile_id === profileId) : saved.some((x) => x.key === savedKey);
+    const isSaved = (profileId?: number) => user ? cloud.some((c) => c.key === savedKey && c.profile_id === (profileId ?? user.profiles[0]?.id)) : !LIVE && saved.some((x) => x.key === savedKey);
     const onSave = (profileId?: number) => {
       if (!alt) return;
+      setSaveMsg(null);
+      if (needLogin) { setPending({ reason: "save", run: () => saveRef.current?.(profileId) }); return; }
       const entry: SavedMed = confirmed.record.medicine_id === "user_pack" && packInfo
         ? { key: savedKey, kind: "pack", brand: packInfo.brand, formulation: packInfo.f, mrp: packInfo.mrp, pack: packInfo.pack, altName: alt.brand_name, monthlySaving: monthly, savedAt: new Date().toISOString() }
         : { key: savedKey, kind: "catalogue", brand: confirmed.record.brand_name, record: confirmed.record, altName: alt.brand_name, monthlySaving: monthly, savedAt: new Date().toISOString() };
       track("saved_medicine");
-      if (plus && profileId != null) {
-        // Cheapest per-tablet price today, so a later drop can raise an alert.
+      if (user) {
+        // Cheapest per-tablet price today, so a later drop can raise an alert (Plus).
         const best = comparison?.alternatives.filter((a) => a.mrp?.freshness === "current" && a.mrp.per_unit != null).map((a) => a.mrp!.per_unit!).sort((a, b) => a - b)[0] ?? null;
-        accountApi.save({ profile_id: profileId, key: savedKey, data: entry, best_unit_price: best }).then((r) => setCloud(r.saved), () => {});
+        accountApi.save({ profile_id: profileId ?? user.profiles[0].id, key: savedKey, data: entry, best_unit_price: best })
+          .then((r) => setCloud(r.saved), (e) => setSaveMsg(e.message === "free_saved_limit" ? t.freeSavedLimit(user.limits.saved) : t.liUnavailable));
         return;
       }
       const next = [entry, ...saved.filter((x) => x.key !== savedKey)];
       setSaved(next); storeSaved(next);
     };
+    saveRef.current = onSave;
     screen = (
       <ResultScreen
         mode={step === 4 && alt ? "savings" : "compare"} onNext={() => { setStep(4); track("savings_viewed"); }}
@@ -374,7 +380,7 @@ export function App() {
         basis={effBasis} setBasis={setBasis} bases={bases} outcome={outcome}
         summary={summary} downloader={downloader} canPrint={canPrint}
         shareText={current && alt ? t.shareText(current.brand_name, alt.brand_name, savingText, siteUrl, calc) : ""} onShared={() => track("shared_whatsapp")}
-        isSaved={isSaved} onSave={onSave} profiles={plus ? user!.profiles : null}
+        isSaved={isSaved} onSave={onSave} profiles={plus ? user!.profiles : null} saveNote={saveMsg} onUpgrade={() => setView("plans")} signedOut={needLogin}
         feedbackContext={{ medicine_name: current?.brand_name, alternative_name: alt?.brand_name, monthly_saving: monthly, lang }}
         catalogue={DEMO ? catalogue : null}
       />
@@ -383,9 +389,9 @@ export function App() {
     screen = (
       <HomeScreen
         headRef={headRef} pickerRef={pickerRef} photo={photo} fileError={fileError} onFile={onFile} onRemove={onRemove}
-        scenario={scenario} setScenario={setScenario} onSample={onSample} phase={phase} identifyError={identifyError} onIdentify={(live) => guard(() => identify(live))} aiName={aiName}
-        manualOpen={manualOpen} setManualOpen={setManualOpen} onManualPick={(m) => guard(() => onManualPick(m))}
-        onIdentifyName={visionLive ? (n) => (needLogin ? (setPending({ run: () => { identifyName(n).catch(() => setIdentifyError(t.nameFailed)); } }), Promise.resolve()) : identifyName(n)) : undefined}
+        scenario={scenario} setScenario={setScenario} onSample={onSample} phase={phase} identifyError={identifyError} onIdentify={identify} aiName={aiName}
+        manualOpen={manualOpen} setManualOpen={setManualOpen} onManualPick={onManualPick}
+        onIdentifyName={visionLive ? identifyName : undefined}
         demo={DEMO} saved={homeSaved} alerts={plus && alerts.length ? <AlertList alerts={alerts} user={user!} /> : null} onRecheck={recheckSaved} onRemoveSaved={removeSaved} checks={checks} coverage={catalogue?.medicines ?? null}
       />
     );
@@ -399,7 +405,8 @@ export function App() {
   if (needLogin && pending) {
     screen = (
       <LoginScreen headRef={headRef} onCancel={() => setPending(null)}
-        onSignedIn={(u) => { const next = pending; setAuth(u); setView("app"); setPending(null); setTimeout(() => next.run(), 0); }} />
+        reason={pending.reason}
+        onSignedIn={(u) => { const next = pending; setAuth(u); setView("app"); setPending(null); setTimeout(() => next.run(), 60); }} />
     );
   }
   const gated = (needLogin && !!pending) || (user && view !== "app");

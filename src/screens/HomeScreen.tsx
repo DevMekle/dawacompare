@@ -11,6 +11,7 @@ import { inr, fmtDate } from "../lib/format";
 import { api } from "../api/client";
 import { calculateSavings } from "../domain/pricing";
 import { ComparableProduct } from "../domain/types";
+import { DEMO_LOGIN } from "../lib/demoLogin";
 
 const { useState, useEffect } = React;
 
@@ -114,6 +115,7 @@ export function HomeScreen(p: Props) {
           <li><Icon name="shieldCheck" size={16} />{t.trustSource}</li>
           <li><Icon name="ban" size={16} />{t.trustNoSell}</li>
         </ul>
+        {!p.demo && <p className="demo-login home-demo"><span><Icon name="info" size={16} />{t.demoLoginLine(DEMO_LOGIN.shown, DEMO_LOGIN.code)}</span></p>}
         <ul className="hero-points">
           {p.coverage != null && p.coverage > 0 && <li><Icon name="database" size={16} />{t.coverage(p.coverage)}</li>}
           {p.checks != null && p.checks > 0 && <li><Icon name="listChecks" size={16} />{t.checksSoFar(p.checks)}</li>}

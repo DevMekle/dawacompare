@@ -5,10 +5,11 @@ import { useI18n } from "../i18n";
 import { accountApi, Me } from "../api/account";
 import { Icon } from "../components/Icon";
 import { Notice, Spinner } from "../components/ui";
+import { DEMO_LOGIN } from "../lib/demoLogin";
 
 const { useState, useEffect, useRef } = React;
 
-export function LoginScreen({ headRef, onSignedIn, onCancel }: { headRef: any; onSignedIn: (u: Me) => void; onCancel: () => void }) {
+export function LoginScreen({ headRef, onSignedIn, onCancel, reason }: { headRef: any; onSignedIn: (u: Me) => void; onCancel: () => void; reason?: "save" }) {
   const { t } = useI18n();
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
@@ -30,13 +31,13 @@ export function LoginScreen({ headRef, onSignedIn, onCancel }: { headRef: any; o
   const digits = phone.replace(/\D/g, "").slice(-10);
   const shown = `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
 
-  const send = async () => {
+  const send = async (d: string = digits, agreed: boolean = consent) => {
     setError(null);
-    if (!/^[6-9]\d{9}$/.test(digits)) return setError(errText("bad_phone"));
-    if (!consent) return setError(errText("consent_required"));
+    if (!/^[6-9]\d{9}$/.test(d)) return setError(errText("bad_phone"));
+    if (!agreed) return setError(errText("consent_required"));
     setBusy(true);
     try {
-      const r = await accountApi.requestOtp(digits);
+      const r = await accountApi.requestOtp(d);
       setTestCode(r.test_code ?? null);
       setStage("code");
       setCode("");
@@ -49,12 +50,12 @@ export function LoginScreen({ headRef, onSignedIn, onCancel }: { headRef: any; o
     }
   };
 
-  const verify = async () => {
+  const verify = async (c: string = code) => {
     setError(null);
-    if (!/^\d{6}$/.test(code)) return setError(errText("bad_code"));
+    if (!/^\d{6}$/.test(c)) return setError(errText("bad_code"));
     setBusy(true);
     try {
-      const r = await accountApi.verifyOtp(digits, code, consent);
+      const r = await accountApi.verifyOtp(digits, c, consent);
       onSignedIn(r.user);
     } catch (e: any) {
       setError(errText(e.message));
@@ -69,8 +70,12 @@ export function LoginScreen({ headRef, onSignedIn, onCancel }: { headRef: any; o
         <span className="login-icon"><Icon name="smartphone" size={26} /></span>
         {stage === "phone" ? (
           <>
-            <h1 ref={headRef} tabIndex={-1}>{t.liTitle}</h1>
-            <p className="lede">{t.liBody}</p>
+            <h1 ref={headRef} tabIndex={-1}>{reason === "save" ? t.liTitleSave : t.liTitle}</h1>
+            <p className="lede">{reason === "save" ? t.liBodySave : t.liBody}</p>
+            <div className="demo-login">
+              <span><Icon name="info" size={16} />{t.demoLoginLine(DEMO_LOGIN.shown, DEMO_LOGIN.code)}</span>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { setPhone(DEMO_LOGIN.shown); setConsent(true); send(DEMO_LOGIN.phone, true); }}>{t.demoLoginUse}</button>
+            </div>
             <form onSubmit={(e: any) => { e.preventDefault(); send(); }} className="login-form">
               <label htmlFor="li-phone" className="field-label">{t.liPhone}</label>
               <div className="phone-box">
@@ -90,6 +95,12 @@ export function LoginScreen({ headRef, onSignedIn, onCancel }: { headRef: any; o
           <>
             <h1 ref={headRef} tabIndex={-1}>{t.liCodeTitle(shown)}</h1>
             {testCode && <Notice tone="warn" icon="info">{t.liTestMode(testCode)}</Notice>}
+            {digits === DEMO_LOGIN.phone && (
+              <div className="demo-login">
+                <span><Icon name="info" size={16} />{t.demoCodeLine(DEMO_LOGIN.code)}</span>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { setCode(DEMO_LOGIN.code); verify(DEMO_LOGIN.code); }}>{t.demoCodeUse}</button>
+              </div>
+            )}
             <form onSubmit={(e: any) => { e.preventDefault(); verify(); }} className="login-form">
               <label htmlFor="li-code" className="field-label">{t.liCode}</label>
               <input id="li-code" ref={codeRef} className="input code-input" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="••••••"
@@ -99,7 +110,7 @@ export function LoginScreen({ headRef, onSignedIn, onCancel }: { headRef: any; o
             </form>
             <div className="secondary-row">
               <button type="button" className="btn btn-quiet" onClick={() => { setStage("phone"); setError(null); setTestCode(null); }}><Icon name="pencil" size={16} />{t.liChange}</button>
-              <button type="button" className="btn btn-quiet" disabled={wait > 0 || busy} onClick={send}><Icon name="rotate" size={16} />{wait > 0 ? t.liResendIn(wait) : t.liResend}</button>
+              <button type="button" className="btn btn-quiet" disabled={wait > 0 || busy} onClick={() => send()}><Icon name="rotate" size={16} />{wait > 0 ? t.liResendIn(wait) : t.liResend}</button>
             </div>
           </>
         )}

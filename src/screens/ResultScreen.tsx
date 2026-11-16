@@ -52,6 +52,11 @@ interface Props {
   onSave: (profileId?: number) => void;
   /** Plus: family profiles to save the medicine for; null on the free plan (saved on this device). */
   profiles: { id: number; name: string }[] | null;
+  /** A message after saving (e.g. the free plan's limit), with a way to upgrade. */
+  saveNote: string | null;
+  onUpgrade: () => void;
+  /** Not signed in: saving asks for sign-in first. */
+  signedOut: boolean;
   feedbackContext: Record<string, unknown>;
   catalogue: { source: string; medicines: number } | null;
 }
@@ -213,10 +218,15 @@ export function ResultScreen(p: Props) {
                 {p.profiles.map((pr) => <option key={pr.id} value={pr.id}>{t.saveFor}: {pr.name}</option>)}
               </select>
             )}
-            <button type="button" className="btn btn-quiet" onClick={() => p.onSave(saveFor)} disabled={saved} aria-pressed={saved}><Icon name={saved ? "check" : "plus"} size={16} />{saved ? t.savedMed : t.saveMed}</button>
+            <button type="button" className="btn btn-quiet" onClick={() => p.onSave(saveFor)} disabled={saved} aria-pressed={saved}><Icon name={saved ? "check" : "plus"} size={16} />{saved ? t.savedMed : p.signedOut ? t.saveSignIn : t.saveMed}</button>
             {p.canPrint && <button type="button" className="btn btn-quiet" onClick={() => window.print()}><Icon name="printer" size={16} />{t.print}</button>}
             <button type="button" className="btn btn-quiet" onClick={p.onNew}><Icon name="rotate" size={16} />{t.newComparison}</button>
           </div>
+        )}
+        {p.saveNote && (
+          <Notice tone="info" icon="star" role="status">
+            {p.saveNote} <button type="button" className="link-btn" onClick={p.onUpgrade}>{t.acUpgrade(49)}</button>
+          </Notice>
         )}
         {ready && <div className="print-only"><SummaryDocument s={p.summary!} docRef={docRef} /></div>}
         {ready && !DEMO && <FeedbackBox context={p.feedbackContext} />}

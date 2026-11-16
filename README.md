@@ -170,11 +170,13 @@ Medicine sales, checkout or delivery; prescriptions, diagnosis or dose advice; s
 
 ## Accounts and DawaCompare Plus
 
-The live site asks people to sign in with their mobile number and a 6-digit SMS code (`/api/account`). Demo mode (`?demo`) skips sign-in.
+Anyone can check a medicine and see the comparison and saving without signing in. Sign-in (mobile number + 6-digit SMS code, `/api/account`) is asked for only when saving a medicine or opening the account. Demo mode (`?demo`) has no accounts.
+
+**Reviewer demo login:** mobile **99999 00000**, code **123456**. No SMS is sent, the account always has Plus, and it can't be deleted. Switch it off with `DEMO_LOGIN=off`.
 
 | Plan | What it includes |
 | --- | --- |
-| Free | Check medicines, compare prices, share and download reports, save medicines on this device |
+| Free | Check medicines, compare prices, share and download reports (no sign-in); save up to 3 medicines to the account |
 | Plus (₹49/month, **test mode**) | Medicines on all devices, family profiles (up to 6), refill reminders, price-drop alerts |
 
 Setup (Vercel → Settings → Environment Variables):
