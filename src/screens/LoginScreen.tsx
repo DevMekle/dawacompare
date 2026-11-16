@@ -5,7 +5,6 @@ import { useI18n } from "../i18n";
 import { accountApi, Me } from "../api/account";
 import { Icon } from "../components/Icon";
 import { Notice, Spinner } from "../components/ui";
-import { DEMO_LOGIN } from "../lib/demoLogin";
 
 const { useState, useEffect, useRef } = React;
 
@@ -72,10 +71,6 @@ export function LoginScreen({ headRef, onSignedIn, onCancel, reason }: { headRef
           <>
             <h1 ref={headRef} tabIndex={-1}>{reason === "save" ? t.liTitleSave : t.liTitle}</h1>
             <p className="lede">{reason === "save" ? t.liBodySave : t.liBody}</p>
-            <div className="demo-login">
-              <span><Icon name="info" size={16} />{t.demoLoginLine(DEMO_LOGIN.shown, DEMO_LOGIN.code)}</span>
-              <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { setPhone(DEMO_LOGIN.shown); setConsent(true); send(DEMO_LOGIN.phone, true); }}>{t.demoLoginUse}</button>
-            </div>
             <form onSubmit={(e: any) => { e.preventDefault(); send(); }} className="login-form">
               <label htmlFor="li-phone" className="field-label">{t.liPhone}</label>
               <div className="phone-box">
@@ -95,12 +90,6 @@ export function LoginScreen({ headRef, onSignedIn, onCancel, reason }: { headRef
           <>
             <h1 ref={headRef} tabIndex={-1}>{t.liCodeTitle(shown)}</h1>
             {testCode && <Notice tone="warn" icon="info">{t.liTestMode(testCode)}</Notice>}
-            {digits === DEMO_LOGIN.phone && (
-              <div className="demo-login">
-                <span><Icon name="info" size={16} />{t.demoCodeLine(DEMO_LOGIN.code)}</span>
-                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { setCode(DEMO_LOGIN.code); verify(DEMO_LOGIN.code); }}>{t.demoCodeUse}</button>
-              </div>
-            )}
             <form onSubmit={(e: any) => { e.preventDefault(); verify(); }} className="login-form">
               <label htmlFor="li-code" className="field-label">{t.liCode}</label>
               <input id="li-code" ref={codeRef} className="input code-input" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="••••••"

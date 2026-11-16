@@ -7,7 +7,6 @@ import type { CatalogueStore } from "../src/catalogue/store";
 import { comparisonWithStore, formulationComparisonWithStore } from "../src/catalogue/service";
 import type { ComparableProduct } from "../src/domain/types";
 import type { SmsSender } from "./sms";
-import { DEMO_LOGIN } from "../src/lib/demoLogin";
 
 export interface Db { query(text: string, params?: unknown[]): Promise<any[]> }
 export interface Deps { db: Db; secret: string; sms: SmsSender | null; store: CatalogueStore; now?: () => Date }
@@ -18,9 +17,6 @@ export const OTP_RESEND_SEC = 30;
 export const SESSION_DAYS = 30;
 export const PLUS_DAYS = 30;
 export const LIMITS = { free: { profiles: 1, saved: 3 }, plus: { profiles: 6, saved: 50 } };
-/** Reviewer demo account (fixed code, no SMS); set DEMO_LOGIN=off to switch it off. */
-export const DEMO_PHONE = `+91${DEMO_LOGIN.phone}`;
-const demoOn = () => (process.env.DEMO_LOGIN ?? "on") !== "off";
 
 export class AccountError extends Error {
   constructor(public code: string, public status = 400) { super(code); }
@@ -68,14 +64,6 @@ export async function requestOtp(d: Deps, phoneInput: unknown): Promise<{ sent: 
   const phone = normalizePhone(phoneInput);
   if (!phone) throw new AccountError("bad_phone");
   const now = nowOf(d);
-  if (phone === DEMO_PHONE && demoOn()) {
-    await d.db.query(
-      `INSERT INTO otp_codes (phone, code_hash, expires_at, attempts, sent_at) VALUES ($1, $2, $3, 0, $4)
-       ON CONFLICT (phone) DO UPDATE SET code_hash = EXCLUDED.code_hash, expires_at = EXCLUDED.expires_at, attempts = 0, sent_at = EXCLUDED.sent_at`,
-      [phone, hashCode(d.secret, phone, DEMO_LOGIN.code), new Date(now.getTime() + OTP_TTL_MIN * 60_000).toISOString(), now.toISOString()],
-    );
-    return { sent: true };
-  }
   const [prev] = await d.db.query("SELECT sent_at FROM otp_codes WHERE phone = $1", [phone]);
   if (prev && now.getTime() - new Date(prev.sent_at).getTime() < OTP_RESEND_SEC * 1000) throw new AccountError("too_soon", 429);
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
@@ -117,10 +105,7 @@ export async function verifyOtp(d: Deps, phoneInput: unknown, codeInput: unknown
   } else {
     await d.db.query("UPDATE users SET last_login_at = $2 WHERE id = $1", [user.id, now.toISOString()]);
   }
-  if (phone === DEMO_PHONE) {
-    await d.db.query("UPDATE users SET plan = 'plus', plan_until = $2 WHERE id = $1", [user.id, new Date(now.getTime() + PLUS_DAYS * 86400_000).toISOString()]);
-  }
-  if (phone !== DEMO_PHONE) await d.db.query("DELETE FROM otp_codes WHERE phone = $1", [phone]);
+  await d.db.query("DELETE FROM otp_codes WHERE phone = $1", [phone]);
   const id = Number(user.id);
   return { token: makeToken(d.secret, id, now), userId: id, created };
 }
@@ -132,7 +117,6 @@ export interface Me {
   plan_until: string | null;
   profiles: { id: number; name: string }[];
   limits: { profiles: number; saved: number };
-  demo: boolean;
 }
 
 async function userRow(d: Deps, uid: number) {
@@ -153,7 +137,6 @@ export async function getMe(d: Deps, uid: number): Promise<Me> {
     plan_until: plus ? new Date(u.plan_until).toISOString() : null,
     profiles: profiles.map((p: any) => ({ id: Number(p.id), name: p.name })),
     limits: { profiles: plus ? LIMITS.plus.profiles : LIMITS.free.profiles, saved: plus ? LIMITS.plus.saved : LIMITS.free.saved },
-    demo: u.phone === DEMO_PHONE,
   };
 }
 
@@ -179,8 +162,6 @@ export async function cancel(d: Deps, uid: number): Promise<Me> {
 }
 
 export async function deleteAccount(d: Deps, uid: number): Promise<void> {
-  const u = await userRow(d, uid);
-  if (u.phone === DEMO_PHONE) throw new AccountError("demo_account");
   await d.db.query("DELETE FROM users WHERE id = $1", [uid]);
 }
 

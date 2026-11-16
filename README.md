@@ -172,8 +172,6 @@ Medicine sales, checkout or delivery; prescriptions, diagnosis or dose advice; s
 
 Anyone can check a medicine and see the comparison and saving without signing in. Sign-in (mobile number + 6-digit SMS code, `/api/account`) is asked for only when saving a medicine or opening the account. Demo mode (`?demo`) has no accounts.
 
-**Reviewer demo login:** mobile **99999 00000**, code **123456**. No SMS is sent, the account always has Plus, and it can't be deleted. Switch it off with `DEMO_LOGIN=off`.
-
 | Plan | What it includes |
 | --- | --- |
 | Free | Check medicines, compare prices, share and download reports (no sign-in); save up to 3 medicines to the account |

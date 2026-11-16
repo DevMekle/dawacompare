@@ -7,8 +7,6 @@ export interface Me {
   plan_until: string | null;
   profiles: { id: number; name: string }[];
   limits: { profiles: number; saved: number };
-  /** The shared reviewer demo account. */
-  demo: boolean;
 }
 
 export interface CloudSaved {

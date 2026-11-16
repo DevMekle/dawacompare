@@ -141,23 +141,6 @@ const rejects = async (p: Promise<unknown>, code: string) => { await assert.reje
   });
 
 
-  await test("reviewer demo login: fixed code, no SMS, Plus switched on, can't be deleted", async () => {
-    const sent: string[] = [];
-    const sms: SmsSender = { name: "fake", sendOtp: async (_p, c) => { sent.push(c); return true; }, sendText: async () => true };
-    const r = await A.requestOtp({ ...deps, sms }, "99999 00000");
-    assert.equal(sent.length, 0);
-    assert.equal(r.test_code, undefined);
-    await A.requestOtp({ ...deps, sms }, "9999900000"); // no 30-second wait for the demo number
-    await rejects(A.verifyOtp(deps, "9999900000", "000000", true), "wrong_code");
-    const v = await A.verifyOtp(deps, "9999900000", "123456", true);
-    const me = await A.getMe(deps, v.userId);
-    assert.equal(me.plan, "plus");
-    assert.equal(me.demo, true);
-    const again = await A.verifyOtp(deps, "9999900000", "123456", true); // the code keeps working for the next reviewer
-    assert.equal(again.userId, v.userId);
-    await rejects(A.deleteAccount(deps, v.userId), "demo_account");
-  });
-
   await test("SMS provider is picked from environment variables", async () => {
     assert.equal(smsFromEnv({}), null);
     assert.equal(smsFromEnv({ SMS_PROVIDER: "msg91", MSG91_AUTHKEY: "k" }), null); // template id missing

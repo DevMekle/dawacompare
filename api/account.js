@@ -6181,9 +6181,6 @@ async function formulationComparisonWithStore(store, f, now = /* @__PURE__ */ ne
   return { alternatives: eligible.map((r) => withPrices(r, prices, now)), excluded };
 }
 
-// src/lib/demoLogin.ts
-var DEMO_LOGIN = { phone: "9999900000", shown: "99999 00000", code: "123456" };
-
 // server/account.ts
 var OTP_TTL_MIN = 10;
 var OTP_MAX_ATTEMPTS = 5;
@@ -6191,8 +6188,6 @@ var OTP_RESEND_SEC = 30;
 var SESSION_DAYS = 30;
 var PLUS_DAYS = 30;
 var LIMITS = { free: { profiles: 1, saved: 3 }, plus: { profiles: 6, saved: 50 } };
-var DEMO_PHONE = `+91${DEMO_LOGIN.phone}`;
-var demoOn = () => (process.env.DEMO_LOGIN ?? "on") !== "off";
 var AccountError = class extends Error {
   constructor(code, status = 400) {
     super(code);
@@ -6232,14 +6227,6 @@ async function requestOtp(d, phoneInput) {
   const phone = normalizePhone(phoneInput);
   if (!phone) throw new AccountError("bad_phone");
   const now = nowOf(d);
-  if (phone === DEMO_PHONE && demoOn()) {
-    await d.db.query(
-      `INSERT INTO otp_codes (phone, code_hash, expires_at, attempts, sent_at) VALUES ($1, $2, $3, 0, $4)
-       ON CONFLICT (phone) DO UPDATE SET code_hash = EXCLUDED.code_hash, expires_at = EXCLUDED.expires_at, attempts = 0, sent_at = EXCLUDED.sent_at`,
-      [phone, hashCode(d.secret, phone, DEMO_LOGIN.code), new Date(now.getTime() + OTP_TTL_MIN * 6e4).toISOString(), now.toISOString()]
-    );
-    return { sent: true };
-  }
   const [prev] = await d.db.query("SELECT sent_at FROM otp_codes WHERE phone = $1", [phone]);
   if (prev && now.getTime() - new Date(prev.sent_at).getTime() < OTP_RESEND_SEC * 1e3) throw new AccountError("too_soon", 429);
   const code = String((0, import_node_crypto.randomInt)(0, 1e6)).padStart(6, "0");
@@ -6279,10 +6266,7 @@ async function verifyOtp(d, phoneInput, codeInput, consent) {
   } else {
     await d.db.query("UPDATE users SET last_login_at = $2 WHERE id = $1", [user.id, now.toISOString()]);
   }
-  if (phone === DEMO_PHONE) {
-    await d.db.query("UPDATE users SET plan = 'plus', plan_until = $2 WHERE id = $1", [user.id, new Date(now.getTime() + PLUS_DAYS * 864e5).toISOString()]);
-  }
-  if (phone !== DEMO_PHONE) await d.db.query("DELETE FROM otp_codes WHERE phone = $1", [phone]);
+  await d.db.query("DELETE FROM otp_codes WHERE phone = $1", [phone]);
   const id = Number(user.id);
   return { token: makeToken(d.secret, id, now), userId: id, created };
 }
@@ -6301,8 +6285,7 @@ async function getMe(d, uid) {
     plan: plus ? "plus" : "free",
     plan_until: plus ? new Date(u.plan_until).toISOString() : null,
     profiles: profiles.map((p2) => ({ id: Number(p2.id), name: p2.name })),
-    limits: { profiles: plus ? LIMITS.plus.profiles : LIMITS.free.profiles, saved: plus ? LIMITS.plus.saved : LIMITS.free.saved },
-    demo: u.phone === DEMO_PHONE
+    limits: { profiles: plus ? LIMITS.plus.profiles : LIMITS.free.profiles, saved: plus ? LIMITS.plus.saved : LIMITS.free.saved }
   };
 }
 async function requirePlus(d, uid) {
@@ -6323,8 +6306,6 @@ async function cancel(d, uid) {
   return getMe(d, uid);
 }
 async function deleteAccount(d, uid) {
-  const u = await userRow(d, uid);
-  if (u.phone === DEMO_PHONE) throw new AccountError("demo_account");
   await d.db.query("DELETE FROM users WHERE id = $1", [uid]);
 }
 var cleanName = (v2) => typeof v2 === "string" ? v2.trim().replace(/\s+/g, " ").slice(0, 40) : "";
